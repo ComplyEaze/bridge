@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_read_profiles::ValidatedCompanyName;
-use crate::xml_text::escape_text as xml_escape;
 
 /// Whether a `BILLALLOCATIONS.LIST` row that carries no `BILLTYPE` is one of
 /// Tally's placeholder containers, and may be ignored.
@@ -750,7 +749,7 @@ const COMPANY_EXTENT_V2_COLLECTION_NAME: &str = "BridgeCompanyBookExtentV2";
 pub(crate) const COMPANY_EXTENT_V2_FETCH: &str =
     "Name, GUID, CompanyNumber, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID";
 
-pub(crate) fn render_company_book_extent_v2(company: &str) -> String {
+pub(crate) fn render_company_book_extent_v2(company: &ValidatedCompanyName) -> String {
     render_company_book_extent_with_contract(
         company,
         COMPANY_EXTENT_V2_COLLECTION_NAME,
@@ -763,7 +762,7 @@ pub(crate) fn render_company_book_extent_v2(company: &str) -> String {
 /// fixed in Bridge's code; a run-time string cannot be passed without leaking it
 /// or holding it in a static.
 fn render_company_book_extent_with_contract(
-    company: &str,
+    company: &ValidatedCompanyName,
     collection: &'static str,
     fetch: &'static str,
 ) -> String {
@@ -771,12 +770,13 @@ fn render_company_book_extent_with_contract(
         r#"<ENVELOPE>
   <HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER>
   <BODY><DESC>
-    <STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES>
+    {static_variables}
     <TDL><TDLMESSAGE><COLLECTION NAME="{collection}" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL>
   </DESC></BODY>
 </ENVELOPE>"#,
         collection = collection,
-        company = xml_escape(company),
+        static_variables =
+            company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "",),
         fetch = fetch,
     )
 }
@@ -790,7 +790,7 @@ const COMPANY_LEDGER_COUNT_FETCH: &str = "Name, GUID, NUMLEDGERS";
 /// collection shape as the company extent, fetching only the company's name and
 /// GUID and its `NUMLEDGERS`. It is deliberately not part of the extent request,
 /// which every reader shares and whose equality is the read bracket.
-pub fn render_company_ledger_count_request(company: &str) -> String {
+pub fn render_company_ledger_count_request(company: &ValidatedCompanyName) -> String {
     render_company_book_extent_with_contract(
         company,
         COMPANY_LEDGER_COUNT_COLLECTION_NAME,

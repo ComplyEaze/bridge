@@ -20,6 +20,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::{ExactDecimal, TallyDate};
+use bridge_tally_protocol::outstandings_shared::bill_allocation_without_type_is_placeholder;
 use serde_json::Value;
 
 use crate::error::{AuditError, Result};
@@ -191,6 +192,135 @@ impl Default for Voucher {
     }
 }
 
+/// One `BILLALLOCATIONS.LIST` row of a voucher: the bill a ledger entry's amount, or part of it,
+/// is set against (#681).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BillAllocation {
+    /// LEDGERNAME of the entry the row sits under.
+    pub ledger: String,
+    pub bill: Bill,
+    /// AMOUNT in paise, debit positive, as a ledger line's.
+    pub amount_paise: i64,
+}
+
+/// A bill allocation's type and the bill it names. The types are the four the app's own bill
+/// trail reads; an On Account row names no bill, so it has no name to hold.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Bill {
+    NewRef(String),
+    AgstRef(String),
+    Advance(String),
+    OnAccount,
+}
+
+/// The read's bill allocations. Whether the read carries them is part of the value, so a read
+/// that did not ask for them is never taken for vouchers that have none (read format 1.2).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum BillAllocations {
+    /// Not every vouchers part says its request asked for them (`bill_allocations`, read format
+    /// 1.2), or the book was not built from a read. Nothing is known of any
+    /// voucher's bills.
+    #[default]
+    NotRead,
+    /// Every vouchers part asked, and every row read. By voucher GUID, each voucher's rows in
+    /// entry order; a voucher not listed has none.
+    Read(BTreeMap<String, Vec<BillAllocation>>),
+    /// Every vouchers part asked, but a row did not read. No allocation of the read is used; the
+    /// rest of the book is unaffected.
+    Unreadable(BillRowRefusal),
+}
+
+/// The first bill allocation row that did not read, and where it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BillRowRefusal {
+    pub part: String,
+    pub voucher_guid: String,
+    pub ledger: String,
+    pub fault: BillRowFault,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BillRowFault {
+    /// No BILLTYPE on a row that carries a name or an amount. A narrower request can drop the
+    /// type (protocol reference §8.2a), and a guessed type would invent an allocation.
+    Untyped,
+    /// A BILLTYPE that is not New Ref, Agst Ref, Advance or On Account.
+    UnknownType,
+    /// A New Ref, Agst Ref or Advance row that names no bill.
+    Unnamed,
+    /// An On Account row that names a bill.
+    NamedOnAccount,
+    /// A typed row with no AMOUNT: an absent amount is not zero.
+    NoAmount,
+    /// An AMOUNT that is not a plain decimal, a foreign-currency amount among them.
+    AmountUnreadable,
+}
+
+/// A vouchers part's bill allocations, added to `found` by voucher GUID, or the first row that
+/// does not read. A row with no type, no name and no amount is Tally's empty placeholder and is
+/// passed over, by the shared placeholder rule; unlike that rule, an untyped row with an amount
+/// is refused, because this read cannot tell a placeholder from an allocation that lost its type
+/// (§8.2a).
+fn part_bill_allocations(
+    root: &Element,
+    part: &str,
+    found: &mut BTreeMap<String, Vec<BillAllocation>>,
+) -> std::result::Result<(), BillRowRefusal> {
+    for v in root.descendants_named("VOUCHER") {
+        if v.attr("REMOTEID").is_none_or(str::is_empty) && v.child("GUID").is_none() {
+            continue; // the template row, as in `load_vouchers`
+        }
+        let guid = match v.child_text("GUID") {
+            "" => v.attr("REMOTEID").unwrap_or_default(),
+            guid => guid,
+        };
+        let mut rows = Vec::new();
+        for entry in v.children_named("ALLLEDGERENTRIES.LIST") {
+            let ledger = entry.child_text("LEDGERNAME");
+            for row in entry.children_named("BILLALLOCATIONS.LIST") {
+                let refuse = |fault| BillRowRefusal {
+                    part: part.to_string(),
+                    voucher_guid: guid.to_string(),
+                    ledger: ledger.to_string(),
+                    fault,
+                };
+                let (name, amount) = (row.child_text("NAME"), row.child_text("AMOUNT"));
+                let named = |bill: fn(String) -> Bill| {
+                    (!name.is_empty())
+                        .then(|| bill(name.to_string()))
+                        .ok_or_else(|| refuse(BillRowFault::Unnamed))
+                };
+                let bill = match row.child_text("BILLTYPE") {
+                    "" if amount.is_empty()
+                        && bill_allocation_without_type_is_placeholder(Some(name)) =>
+                    {
+                        continue
+                    }
+                    "" => return Err(refuse(BillRowFault::Untyped)),
+                    "New Ref" => named(Bill::NewRef)?,
+                    "Agst Ref" => named(Bill::AgstRef)?,
+                    "Advance" => named(Bill::Advance)?,
+                    "On Account" if name.is_empty() => Bill::OnAccount,
+                    "On Account" => return Err(refuse(BillRowFault::NamedOnAccount)),
+                    _ => return Err(refuse(BillRowFault::UnknownType)),
+                };
+                let amount_paise = flip(amount, part)
+                    .map_err(|_| refuse(BillRowFault::AmountUnreadable))?
+                    .ok_or_else(|| refuse(BillRowFault::NoAmount))?;
+                rows.push(BillAllocation {
+                    ledger: ledger.to_string(),
+                    bill,
+                    amount_paise,
+                });
+            }
+        }
+        if !rows.is_empty() {
+            found.insert(guid.to_string(), rows);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct TbRow {
     pub opening_paise: i64,
@@ -203,6 +333,41 @@ impl TbRow {
     pub fn movement_paise(&self) -> i64 {
         self.closing_paise - self.opening_paise
     }
+
+    /// The closing the row's own movements give: opening plus debit less credit (Dr positive).
+    /// `None` when the sum overflows `i64`. Tally's `closing_paise` is a separate field and can
+    /// differ from it (see [`TbMovements`]).
+    pub fn closing_by_movements_paise(&self) -> Option<i64> {
+        self.opening_paise
+            .checked_add(self.debit_paise)?
+            .checked_sub(self.credit_paise)
+    }
+
+    /// Whether Tally's closing field is the row's opening plus debit less credit. `None` when
+    /// the arithmetic overflows `i64`, never a guess in either direction.
+    pub fn movements(&self) -> Option<TbMovements> {
+        let by_paise = self
+            .closing_paise
+            .checked_sub(self.closing_by_movements_paise()?)?;
+        Some(if by_paise == 0 {
+            TbMovements::Tie
+        } else {
+            TbMovements::Differ { by_paise }
+        })
+    }
+}
+
+/// Whether a Trial Balance row's closing field is its opening plus debit less credit. On a
+/// Closing Stock ledger whose closing was keyed on Tally's screen the field keeps the opening and
+/// the keyed change shows only as its debit, so the row does not tie and the closing field is not
+/// the closing stock Tally's statements use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TbMovements {
+    Tie,
+    /// The closing field less (opening + debit - credit), Dr positive.
+    Differ {
+        by_paise: i64,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -229,6 +394,8 @@ pub struct Book {
     /// The closing stock a ledger-wise trial balance leaves out (`financial_statements`), read
     /// once here from the Stock Summary dated the trial balance's last day.
     pub closing_stock: ClosingStock,
+    /// The vouchers' bill allocations, when the read asked for them (#681). No tax-audit rule uses them yet.
+    pub bill_allocations: BillAllocations,
 }
 
 /// Opening stock as of the trial balance's first day. Tally holds it on the stock items, never
@@ -260,6 +427,15 @@ pub enum OpeningStockUnknown {
     NotAtBooksStart,
     /// The stock-items part did not parse; `stock` refuses on it with the typed error.
     Unreadable,
+    /// The stock-items part parsed but lists no stock item, so no opening stock is read; it is
+    /// not taken as zero (#1602, a declared behaviour difference from the reference).
+    NoStockItems,
+    /// The stock-items part lists items, but none carries an opening value, so no opening stock is
+    /// read; it is not taken as zero (#1602, a declared behaviour difference from the reference).
+    NoOpeningValues,
+    /// The stock items' opening values add up to more than the paise total can hold. No real
+    /// book reaches it; the total is never wrapped or taken in part (#1602).
+    TooLarge,
 }
 
 impl OpeningStockUnknown {
@@ -270,6 +446,11 @@ impl OpeningStockUnknown {
                 "not taken: the read does not show the trial balance starting on the books' first day"
             }
             Self::Unreadable => "unreadable",
+            Self::NoStockItems => "not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil",
+            Self::NoOpeningValues => "not taken: no stock item carries an opening value",
+            Self::TooLarge => {
+                "not taken: the stock items' opening values add up to more than can be held"
+            }
         }
     }
 }
@@ -291,12 +472,21 @@ fn opening_stock(
         return OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart);
     }
     match crate::stock_read::stock_item_masters(items) {
-        Ok(masters) => OpeningStock::Valued(
-            masters
-                .values()
-                .map(|m| m.opening_value_paise.unwrap_or(0))
-                .sum(),
-        ),
+        Ok(masters) if masters.is_empty() => {
+            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)
+        }
+        Ok(masters) if masters.values().all(|m| m.opening_value_paise.is_none()) => {
+            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)
+        }
+        Ok(masters) => masters
+            .values()
+            .try_fold(0_i64, |total, m| {
+                total.checked_add(m.opening_value_paise.unwrap_or(0))
+            })
+            .map_or(
+                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),
+                OpeningStock::Valued,
+            ),
         Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),
     }
 }
@@ -1200,13 +1390,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
 
     let after_voucher_high_water = read.after.as_ref().and_then(|a| a.alter_voucher_id);
     let mut parts: Vec<(&str, Vec<Voucher>)> = Vec::new(); // each vouchers part's name and vouchers
+    let bills_asked = read.voucher_parts().iter().all(|vp| vp.bill_allocations);
+    let mut bills = Ok(BTreeMap::new());
     for vp in read.voucher_parts() {
-        let parsed = load_vouchers(
-            &xml::read(&vp.content, &vp.id)?,
-            &vp.id,
-            &base,
-            side.as_ref(),
-        )?;
+        let root = xml::read(&vp.content, &vp.id)?;
+        let parsed = load_vouchers(&root, &vp.id, &base, side.as_ref())?;
         let w = window_of(vp);
         let outside: Vec<&Voucher> = parsed
             .vouchers
@@ -1254,6 +1442,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
                     vp.id, vp.stored_name, vp.name
                 ),
             ));
+        }
+        if bills_asked {
+            bills = bills.and_then(|mut found| {
+                part_bill_allocations(&root, &vp.id, &mut found).map(|()| found)
+            });
         }
         parts.push((vp.name.as_str(), parsed.vouchers));
     }
@@ -1333,6 +1526,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         }),
         opening_stock,
         closing_stock,
+        bill_allocations: match (bills_asked, bills) {
+            (false, _) => BillAllocations::NotRead,
+            (true, Ok(found)) => BillAllocations::Read(found),
+            (true, Err(refusal)) => BillAllocations::Unreadable(refusal),
+        },
     })
 }
 
@@ -2087,6 +2285,7 @@ mod tests {
                 "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
             )
             .into_bytes(),
+            bill_allocations: false,
         }
     }
 
@@ -2106,6 +2305,7 @@ mod tests {
                 "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
             )
             .into_bytes(),
+            bill_allocations: false,
         }
     }
 
@@ -2246,12 +2446,395 @@ mod tests {
             opening_stock(Some(true), Some(&items), None, None),
             OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
         );
+        // #1602, declared behaviour differences from the reference (which takes both as a known
+        // zero): a part that lists no stock item, and items none of which carries an opening value,
+        // give no opening stock. One item without a value beside valued ones still counts as
+        // nothing, as above. These pin the change until a Chartered Accountant's hand-worked answer
+        // for such a book is recorded.
+        assert_eq!(
+            opening_stock(
+                Some(true),
+                Some(&stock_items_part("")),
+                Some(&from),
+                Some(&from)
+            ),
+            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)
+        );
+        let unvalued = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"></STOCKITEM><STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&unvalued), Some(&from), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)
+        );
+        let zero_valued = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>0.00</OPENINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&zero_valued), Some(&from), Some(&from)),
+            OpeningStock::Valued(0),
+            "an opening value of zero is a value"
+        );
+        // Opening values whose total would not fit are not taken, in either direction, and never
+        // wrapped (#1602). Each value alone parses. The value is built, not written out: a digit run
+        // this long reads as an identifier to the merge gate's privacy scan.
+        let big = format!("6{}.00", "0".repeat(16));
+        for (one, other) in [
+            (format!("-{big}"), format!("-{big}")),
+            (big.clone(), big.clone()),
+        ] {
+            let huge = stock_items_part(&format!(
+                "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>{one}</OPENINGVALUE></STOCKITEM>\
+                 <STOCKITEM NAME=\"Latch\"><OPENINGVALUE>{other}</OPENINGVALUE></STOCKITEM>"
+            ));
+            assert_eq!(
+                opening_stock(Some(true), Some(&huge), Some(&from), Some(&from)),
+                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),
+                "{one} {other}"
+            );
+        }
+        let one_huge = stock_items_part(&format!(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>-{big}</OPENINGVALUE></STOCKITEM>"
+        ));
+        assert_eq!(
+            opening_stock(Some(true), Some(&one_huge), Some(&from), Some(&from)),
+            OpeningStock::Valued(6_000_000_000_000_000_000)
+        );
         let broken = stock_items_part(
             "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>nine</OPENINGVALUE></STOCKITEM>",
         );
         assert_eq!(
             opening_stock(Some(true), Some(&broken), Some(&from), Some(&from)),
             OpeningStock::Unknown(OpeningStockUnknown::Unreadable)
+        );
+    }
+    fn row(opening: i64, debit: i64, credit: i64, closing: i64) -> TbRow {
+        TbRow {
+            opening_paise: opening,
+            debit_paise: debit,
+            credit_paise: credit,
+            closing_paise: closing,
+        }
+    }
+
+    #[test]
+    fn a_row_ties_when_its_closing_is_opening_plus_debit_less_credit() {
+        assert_eq!(
+            row(100, 40, 10, 130).closing_by_movements_paise(),
+            Some(130)
+        );
+        assert_eq!(row(100, 40, 10, 130).movements(), Some(TbMovements::Tie));
+        assert_eq!(row(0, 0, 0, 0).movements(), Some(TbMovements::Tie));
+        // A closing-only row carries a closing nothing in its columns gives.
+        assert_eq!(
+            row(0, 0, 0, -500).movements(),
+            Some(TbMovements::Differ { by_paise: -500 })
+        );
+    }
+
+    #[test]
+    fn the_gap_is_the_closing_less_the_movements_in_dr_positive_paise() {
+        assert_eq!(
+            row(100, 40, 0, 100).movements(),
+            Some(TbMovements::Differ { by_paise: -40 })
+        );
+        assert_eq!(
+            row(0, 365_050, 0, 365_550).movements(),
+            Some(TbMovements::Differ { by_paise: 500 })
+        );
+        // The credit column lowers the movements' closing, so a closing above it shows a gap.
+        assert_eq!(
+            row(100, 0, 30, 100).movements(),
+            Some(TbMovements::Differ { by_paise: 30 })
+        );
+    }
+
+    #[test]
+    fn overflow_is_none_never_a_tie_or_a_gap() {
+        assert_eq!(row(i64::MAX, 1, 0, 0).closing_by_movements_paise(), None);
+        assert_eq!(row(i64::MAX, 1, 0, 0).movements(), None);
+        assert_eq!(row(i64::MIN, 0, 1, 0).closing_by_movements_paise(), None);
+        // The movements fit but the gap does not.
+        assert_eq!(row(0, 1, 0, i64::MIN).movements(), None);
+    }
+
+    const NONINT_CAPTURE: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml"
+    );
+    const INTEGRATED_CAPTURE: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml"
+    );
+
+    /// A book of a captured Trial Balance answer (a real read of an invented lab company, see
+    /// `bridge-tally-protocol`'s native fixture provenance): its rows through `load_tb`, and each
+    /// ledger under its own parent group only.
+    fn captured_book(content: &[u8]) -> Book {
+        let root = crate::xml::read(content, "captured trial balance").unwrap();
+        let tb = load_tb(&root, "captured trial balance").unwrap();
+        let ledgers = root
+            .descendants_named("LEDGER")
+            .into_iter()
+            .filter_map(|l| {
+                let name = l.attr("NAME").filter(|n| !n.is_empty())?.to_string();
+                let parent = l.child_text("PARENT").to_string();
+                Some((
+                    name.clone(),
+                    Ledger {
+                        name,
+                        parent: parent.clone(),
+                        chain: vec![parent],
+                        chain_complete: true,
+                        master_opening_paise: 0,
+                        guid: String::new(),
+                        masterid: None,
+                        pan: String::new(),
+                        gstin: String::new(),
+                    },
+                ))
+            })
+            .collect();
+        Book {
+            tb,
+            ledgers,
+            ..Default::default()
+        }
+    }
+
+    /// On both captured books a Closing Stock ledger was opened at 1,000.00 and keyed to a closing
+    /// of 1,400.00: Tally's closing field kept the opening and the keyed 400.00 shows only as its
+    /// debit. It is the only one of the eight rows that does not tie.
+    #[test]
+    fn the_keyed_closing_stock_row_is_the_only_one_that_does_not_tie_on_both_captures() {
+        for content in [NONINT_CAPTURE, INTEGRATED_CAPTURE] {
+            let book = captured_book(content);
+            let stock = &book.tb["Closing Stock"];
+            assert_eq!(
+                (
+                    stock.opening_paise,
+                    stock.debit_paise,
+                    stock.credit_paise,
+                    stock.closing_paise
+                ),
+                (100_000, 40_000, 0, 100_000)
+            );
+            assert_eq!(stock.closing_by_movements_paise(), Some(140_000));
+            assert_eq!(
+                stock.movements(),
+                Some(TbMovements::Differ { by_paise: -40_000 })
+            );
+            let differing: Vec<&str> = book
+                .tb
+                .iter()
+                .filter(|(_, t)| t.movements() != Some(TbMovements::Tie))
+                .map(|(n, _)| n.as_str())
+                .collect();
+            assert_eq!(differing, ["Closing Stock"]);
+        }
+    }
+
+    /// The Trial Balance test states the gap beside the unchanged closing field, once.
+    #[test]
+    fn trial_balance_states_the_gap_beside_the_closing_field_on_both_captures() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        for content in [NONINT_CAPTURE, INTEGRATED_CAPTURE] {
+            let book = captured_book(content);
+            let r = crate::trial_balance::run(&book, &rules).unwrap();
+            let tag = crate::ledger_ids::stable_ledger_tag(&book, "Closing Stock").unwrap();
+            let int = |id: String| {
+                r.figures
+                    .iter()
+                    .find(|f| f.id == format!("trial_balance.{id}"))
+                    .map(|f| f.value.clone())
+            };
+            assert_eq!(
+                int(format!("tb_closing_{tag}")),
+                Some(crate::findings::Value::Int(100_000))
+            );
+            assert_eq!(
+                int(format!("tb_closing_not_movements_{tag}")),
+                Some(crate::findings::Value::Int(-40_000))
+            );
+            let gaps = r
+                .figures
+                .iter()
+                .filter(|f| f.id.starts_with("trial_balance.tb_closing_not_movements_"))
+                .count();
+            assert_eq!(gaps, 1);
+            let violations = crate::trial_balance::check_invariants(&book, &r).unwrap();
+            assert!(
+                !violations.iter().any(|m| m.starts_with("TB-3")),
+                "{violations:?}"
+            );
+        }
+    }
+
+    /// `financial_statements` takes the closing stock from the movements, so a closing field that
+    /// kept the opening does not understate it. Not integrated: Tally's own Profit and Loss on that
+    /// book used 1,400.00. Integrated: Tally valued the stock from the item, so the ledger beside
+    /// it leaves the profit unknown rather than choosing a figure.
+    #[test]
+    fn financial_statements_use_the_movements_on_both_captures() {
+        let none = BTreeSet::new();
+        let book = captured_book(NONINT_CAPTURE);
+        let (s, _) = crate::financial_statements::compute(&book, &none).unwrap();
+        assert_eq!(
+            s.stock_basis,
+            crate::financial_statements::StockBasis::Ledgers
+        );
+        assert_eq!(s.closing_stock, Some(140_000));
+        assert_eq!(s.closing_stock_tb_field, 100_000);
+
+        let mut book = captured_book(INTEGRATED_CAPTURE);
+        book.opening_stock = OpeningStock::Valued(100_000);
+        book.closing_stock = ClosingStock::Valued(120_000);
+        let (s, _) = crate::financial_statements::compute(&book, &none).unwrap();
+        assert!(matches!(
+            &s.stock_basis,
+            crate::financial_statements::StockBasis::Unknown { why, .. }
+                if why == &[crate::financial_statements::StockUnknown::LedgerAlso]
+        ));
+        assert_eq!(s.gross_profit, None);
+        assert_eq!(s.net_profit, None);
+    }
+
+    /// The audit read's own vouchers request, answered live by the invented pilot-lab company (see
+    /// that folder's PROVENANCE.md): 167 allocation rows under 168 entries, of which 165 are empty.
+    const PILOT_LAB_VOUCHERS: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml"
+    );
+
+    fn bills_of(
+        xml: &str,
+    ) -> std::result::Result<BTreeMap<String, Vec<BillAllocation>>, BillRowRefusal> {
+        let root = crate::xml::read(xml.as_bytes(), "vouchers-x").unwrap();
+        let mut found = BTreeMap::new();
+        part_bill_allocations(&root, "vouchers-x", &mut found).map(|()| found)
+    }
+
+    /// One voucher with one entry holding `rows`.
+    fn bill_entry(rows: &str) -> String {
+        format!(
+            "<ENVELOPE><BODY><DATA><COLLECTION><VOUCHER><GUID>g-1</GUID>\
+             <ALLLEDGERENTRIES.LIST><LEDGERNAME>Supplier</LEDGERNAME><AMOUNT>10.00</AMOUNT>\
+             {rows}</ALLLEDGERENTRIES.LIST></VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+        )
+    }
+
+    fn bill_row(name: &str, kind: &str, amount: &str) -> String {
+        format!(
+            "<BILLALLOCATIONS.LIST><NAME>{name}</NAME><BILLTYPE>{kind}</BILLTYPE>\
+             <AMOUNT>{amount}</AMOUNT></BILLALLOCATIONS.LIST>"
+        )
+    }
+
+    /// #681: the captured answer gives exactly its two typed rows, debit positive, and passes over
+    /// its 165 empty ones.
+    #[test]
+    fn the_pilot_lab_capture_reads_its_two_bill_allocations() {
+        let root = crate::xml::read(PILOT_LAB_VOUCHERS, "vouchers-pilot").unwrap();
+        let mut found = BTreeMap::new();
+        part_bill_allocations(&root, "vouchers-pilot", &mut found).unwrap();
+        let supplier = |bill| {
+            vec![BillAllocation {
+                ledger: "BRIDGE Supplier RJ".to_string(),
+                bill,
+                amount_paise: -105_000,
+            }]
+        };
+        let expected = BTreeMap::from([
+            (
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000017".to_string(),
+                supplier(Bill::NewRef("SUP/0001".to_string())),
+            ),
+            (
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000018".to_string(),
+                supplier(Bill::AgstRef("SUP/0001".to_string())),
+            ),
+        ]);
+        assert_eq!(found, expected);
+    }
+
+    #[test]
+    fn each_bill_type_reads_and_an_empty_row_is_passed_over() {
+        let rows = [
+            "<BILLALLOCATIONS.LIST>  </BILLALLOCATIONS.LIST>".to_string(),
+            "<BILLALLOCATIONS.LIST><NAME> </NAME><BILLTYPE></BILLTYPE><AMOUNT></AMOUNT></BILLALLOCATIONS.LIST>".to_string(),
+            bill_row("B/1", "New Ref", "4.00"),
+            bill_row("B/0", "Agst Ref", "-1.00"),
+            bill_row("B/2", "Advance", "2.00"),
+            bill_row("", "On Account", "5.00"),
+        ]
+        .concat();
+        let found = bills_of(&bill_entry(&rows)).unwrap();
+        let bills: Vec<(Bill, i64)> = found["g-1"]
+            .iter()
+            .map(|a| (a.bill.clone(), a.amount_paise))
+            .collect();
+        assert_eq!(
+            bills,
+            [
+                (Bill::NewRef("B/1".to_string()), -400),
+                (Bill::AgstRef("B/0".to_string()), 100),
+                (Bill::Advance("B/2".to_string()), -200),
+                (Bill::OnAccount, -500),
+            ]
+        );
+        assert!(found["g-1"].iter().all(|a| a.ledger == "Supplier"));
+        // A voucher whose rows are all empty is not listed: it has none.
+        assert_eq!(
+            bills_of(&bill_entry("<BILLALLOCATIONS.LIST/>")),
+            Ok(BTreeMap::new())
+        );
+    }
+
+    /// #681 step 3: a row that does not read is refused with where it is and why, never skipped
+    /// or guessed; an untyped row that carries an amount is not taken for a placeholder.
+    #[test]
+    fn a_bill_row_that_does_not_read_is_refused_by_its_fault() {
+        let fault = |rows: &str| bills_of(&bill_entry(rows)).unwrap_err().fault;
+        assert_eq!(
+            fault("<BILLALLOCATIONS.LIST><AMOUNT>10.00</AMOUNT></BILLALLOCATIONS.LIST>"),
+            BillRowFault::Untyped
+        );
+        assert_eq!(fault(&bill_row("B/1", "", "")), BillRowFault::Untyped);
+        assert_eq!(
+            fault(&bill_row("B/1", "Against", "1.00")),
+            BillRowFault::UnknownType
+        );
+        for kind in ["New Ref", "Agst Ref", "Advance"] {
+            assert_eq!(
+                fault(&bill_row("", kind, "1.00")),
+                BillRowFault::Unnamed,
+                "{kind}"
+            );
+        }
+        assert_eq!(
+            fault(&bill_row("B/1", "On Account", "1.00")),
+            BillRowFault::NamedOnAccount
+        );
+        assert_eq!(
+            fault(&bill_row("B/1", "New Ref", "")),
+            BillRowFault::NoAmount
+        );
+        assert_eq!(
+            fault(&bill_row("B/1", "New Ref", "$5.00 @ \u{20b9} 83.00/$")),
+            BillRowFault::AmountUnreadable
+        );
+        let refusal = bills_of(&bill_entry(&format!(
+            "{}{}",
+            bill_row("B/1", "New Ref", "1.00"),
+            bill_row("B/2", "New Ref", "")
+        )))
+        .unwrap_err();
+        assert_eq!(
+            refusal,
+            BillRowRefusal {
+                part: "vouchers-x".to_string(),
+                voucher_guid: "g-1".to_string(),
+                ledger: "Supplier".to_string(),
+                fault: BillRowFault::NoAmount,
+            }
         );
     }
 }

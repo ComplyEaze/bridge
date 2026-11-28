@@ -853,8 +853,9 @@ impl Server {
                 mailing_details,
             } => {
                 let (gst_details, mailing_details) = (*gst_details, *mailing_details);
-                let today = TallyDate::parse(tally_host_today())
-                    .map_err(|_| ToolFailure::from("current_date_invalid".to_string()))?;
+                let today = TallyDate::parse(tally_host_today()).map_err(|_| {
+                    ToolFailure::from(super::failure_code::ReadCode::CurrentDateInvalid)
+                })?;
                 let listing = self
                     .runtime
                     .fetch_agent_party_ledger_masters_with_evidence(

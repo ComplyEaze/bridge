@@ -197,8 +197,8 @@ impl Server {
         let items = item_guids(args, MAX_STOCK_BY_BATCH_ITEMS)?
             .ok_or_else(|| "argument_invalid:items".to_string())?;
         let (company, identity, prior) = self.verified_company(guid).await?;
-        let today =
-            TallyDate::parse(tally_host_today()).map_err(|_| "current_date_invalid".to_string())?;
+        let today = TallyDate::parse(tally_host_today())
+            .map_err(|_| super::failure_code::ReadCode::CurrentDateInvalid)?;
         let read = self
             .runtime
             .fetch_stock_by_batch(self.tally_config(), &identity, as_of, items, today)

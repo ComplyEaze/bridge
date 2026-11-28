@@ -330,17 +330,33 @@ impl ParsedImportEvidence {
     }
 }
 
-impl TallyImportResult {
-    /// Accepts only an exact, non-zero intended import mutation with no
-    /// negative result counters or reported line errors.
-    pub fn is_clean_success_for(
+/// Tally's seven import result counters, every one of them reported. Its
+/// field names and its refusal of unknown fields are a stored format: a
+/// caller may keep it in a record that a later release must still read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImportCounters {
+    pub created: u64,
+    pub altered: u64,
+    pub deleted: u64,
+    pub ignored: u64,
+    pub errors: u64,
+    pub cancelled: u64,
+    pub exceptions: u64,
+}
+
+impl ImportCounters {
+    /// The counter half of `docs/tally/IMPLEMENTATION_GUIDE.md` §3.2: exactly
+    /// the intended, non-zero mutation, and nothing ignored, errored,
+    /// cancelled or excepted. [`TallyImportResult::is_clean_success_for`] adds
+    /// the line errors, which these counters do not hold.
+    pub fn are_exactly(
         &self,
         expected_created: u64,
         expected_altered: u64,
         expected_deleted: u64,
     ) -> bool {
         (expected_created > 0 || expected_altered > 0 || expected_deleted > 0)
-            && self.counter_presence.all_reported()
             && self.created == expected_created
             && self.altered == expected_altered
             && self.deleted == expected_deleted
@@ -348,7 +364,38 @@ impl TallyImportResult {
             && self.errors == 0
             && self.cancelled == 0
             && self.exceptions == 0
-            && self.line_error_count == 0
+    }
+}
+
+impl TallyImportResult {
+    /// The counters, when Tally reported every one of them. A counter Tally
+    /// did not report is not a zero (AGENTS.md P3), so then there are none.
+    pub fn reported_counters(&self) -> Option<ImportCounters> {
+        self.counter_presence
+            .all_reported()
+            .then_some(ImportCounters {
+                created: self.created,
+                altered: self.altered,
+                deleted: self.deleted,
+                ignored: self.ignored,
+                errors: self.errors,
+                cancelled: self.cancelled,
+                exceptions: self.exceptions,
+            })
+    }
+
+    /// Accepts only an exact, non-zero intended import mutation, with every
+    /// counter reported, no negative result counters and no line errors.
+    pub fn is_clean_success_for(
+        &self,
+        expected_created: u64,
+        expected_altered: u64,
+        expected_deleted: u64,
+    ) -> bool {
+        self.line_error_count == 0
+            && self.reported_counters().is_some_and(|counters| {
+                counters.are_exactly(expected_created, expected_altered, expected_deleted)
+            })
     }
 }
 

@@ -148,6 +148,26 @@ pub(super) fn parse_agent_changed_rows(
     parse_agent_rows_with_accounting_state(xml, true, company_guid)
 }
 
+/// [`parse_agent_changed_rows`] under [`CompositePolicy::NameLedger`]: an entry
+/// whose amount is a currency composite carries `"currency_composite": true`
+/// and its amount as Tally sent it, which no caller may sum. Only
+/// `ledger_movement`'s first-day read of a several-currency book parses this
+/// way (#683).
+pub(super) fn parse_agent_changed_rows_naming_composite_ledgers(
+    xml: &str,
+    company_guid: &str,
+) -> Result<Vec<Value>, String> {
+    refused_composites(parse_voucher_rows(
+        xml,
+        true,
+        false,
+        company_guid,
+        CompositePolicy::NameLedger,
+        GstDetailsShown::Withheld,
+        (NamedVoucherFields::NOT_ASKED, StockLines::NotAsked),
+    )?)
+}
+
 /// Changed rows plus `effective_date`, which only import verification reads.
 /// The public voucher tools do not fetch it and their rows do not carry it.
 pub(super) fn parse_import_verification_rows(
@@ -260,9 +280,18 @@ enum VoucherDetail<'row> {
 
 impl<'row> VoucherDetail<'row> {
     fn of(row: &'row BTreeMap<String, String>, element: &str) -> Self {
-        match row.get(element).map(|value| value.trim()) {
+        match Self::of_untrimmed(row, element) {
+            Self::Present(value) => Self::Present(value.trim()),
+            Self::Absent => Self::Absent,
+            Self::NotReported => Self::NotReported,
+        }
+    }
+
+    /// The element's text as Tally returned it, spaces around it kept; all spaces is still absent.
+    fn of_untrimmed(row: &'row BTreeMap<String, String>, element: &str) -> Self {
+        match row.get(element) {
             None => Self::NotReported,
-            Some("") => Self::Absent,
+            Some(value) if value.trim().is_empty() => Self::Absent,
             Some(value) => Self::Present(value),
         }
     }
@@ -270,7 +299,7 @@ impl<'row> VoucherDetail<'row> {
     /// A present value of an element Tally types as a date must be one, or the read is refused.
     fn require_date(&self, refusal: &str) -> Result<(), String> {
         if let Self::Present(date) = self {
-            bridge_tally_core::TallyDate::parse((*date).to_string())
+            bridge_tally_core::TallyDate::parse(date.trim().to_string())
                 .map_err(|_| refusal.to_string())?;
         }
         Ok(())
@@ -298,6 +327,10 @@ fn row_says_details(row: &BTreeMap<String, String>, details: &[&VoucherDetail]) 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum EInvoiceFields {
     Asked,
+    /// Asked by an invoice's read after its post (#2162 item 9), which compares each value as
+    /// Tally returned it: a space around a value is a difference there. The request is the one
+    /// `Asked` sends.
+    AskedAsReturned,
     NotAsked,
 }
 
@@ -310,14 +343,21 @@ impl EInvoiceFields {
         })
     }
 
+    /// Whether the fetch list names the three e-invoice words.
+    pub(super) const fn asked(self) -> bool {
+        !matches!(self, Self::NotAsked)
+    }
+
     /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2j).
     fn details(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
-        if self == Self::NotAsked {
-            return Ok(None);
-        }
-        let irn = VoucherDetail::of(row, "IRN");
-        let ack_no = VoucherDetail::of(row, "IRNACKNO");
-        let ack_date = VoucherDetail::of(row, "IRNACKDATE");
+        let detail = match self {
+            Self::NotAsked => return Ok(None),
+            Self::Asked => VoucherDetail::of,
+            Self::AskedAsReturned => VoucherDetail::of_untrimmed,
+        };
+        let irn = detail(row, "IRN");
+        let ack_no = detail(row, "IRNACKNO");
+        let ack_date = detail(row, "IRNACKDATE");
         ack_date.require_date("voucher_irn_ack_date_invalid")?;
         if !row_says_details(row, &[&irn, &ack_no, &ack_date]) {
             return Ok(None);
@@ -569,10 +609,23 @@ impl NamedVoucherFields {
         gst: VoucherGstFields::NotAsked,
     };
 
+    /// The e-invoice words alone: a `vouchers` call with `include_e_invoice` only (#1378), and the
+    /// request of an invoice's e-invoice read after its post (#2162 item 9).
+    pub(super) const E_INVOICE_ONLY: Self = Self {
+        e_invoice: EInvoiceFields::Asked,
+        gst: VoucherGstFields::NotAsked,
+    };
+
+    /// How the answer to an invoice's e-invoice read after its post is parsed: the same words,
+    /// each value kept as Tally returned it.
+    pub(super) const E_INVOICE_AS_RETURNED: Self = Self {
+        e_invoice: EInvoiceFields::AskedAsReturned,
+        gst: VoucherGstFields::NotAsked,
+    };
+
     /// Whether the list names anything: a const `self != Self::NOT_ASKED`.
     pub(super) const fn names_any(self) -> bool {
-        matches!(self.e_invoice, EInvoiceFields::Asked)
-            || matches!(self.gst, VoucherGstFields::Asked)
+        self.e_invoice.asked() || matches!(self.gst, VoucherGstFields::Asked)
     }
 }
 
@@ -583,12 +636,30 @@ enum CompositePolicy {
     Refuse,
     /// A Tally composite withholds its voucher; anything else still fails.
     Withhold,
+    /// `ledger_movement` on a several-currency book at its first day (#683): a
+    /// composite entry is kept with no figure and marked, so its ledger is set
+    /// aside by name. The movement's window answers each bill allocation
+    /// amount-only, as its fetch names no allocation field (§8.2n), and an
+    /// amount-only allocation is a placeholder, skipped under every policy. One
+    /// with a `BILLTYPE` and a composite amount, which that window has not been
+    /// seen to send, still fails it. Anything else still fails.
+    NameLedger,
 }
 
 impl CompositePolicy {
     fn withholds(self, amount: &str) -> bool {
-        self == Self::Withhold && is_balance_composite(amount) && composite_signs_agree(amount)
+        self == Self::Withhold && is_currency_composite(amount)
     }
+
+    fn names_ledger(self, amount: &str) -> bool {
+        self == Self::NameLedger && is_currency_composite(amount)
+    }
+}
+
+/// A composite as a voucher amount carries it: the shared classifier, with one
+/// sign on both amounts.
+fn is_currency_composite(amount: &str) -> bool {
+    is_balance_composite(amount) && composite_signs_agree(amount)
 }
 
 /// A voucher with an amount Tally stored as a composite, read with the base amount as `amount`
@@ -778,7 +849,8 @@ impl VoucherRow {
         }
     }
 
-    fn row(&self) -> &Value {
+    /// The row as read, or a withheld one as its [`WithheldVoucher::filter_view`], with no amount.
+    pub(super) fn row(&self) -> &Value {
         match self {
             Self::Read(row) => row,
             Self::Withheld(withheld) => &withheld.view,
@@ -1149,6 +1221,7 @@ fn parse_voucher_rows(
                             .get("AMOUNT")
                             .filter(|value| !value.trim().is_empty())
                             .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                        let mut entry_composite = false;
                         let parsed_amount =
                             match bridge_tally_core::ExactDecimal::parse(amount.clone()) {
                                 Ok(parsed) => Some(parsed),
@@ -1156,8 +1229,13 @@ fn parse_voucher_rows(
                                     withheld = true;
                                     None
                                 }
+                                Err(_) if composites.names_ledger(amount) => {
+                                    entry_composite = true;
+                                    None
+                                }
                                 Err(_) => return Err("voucher_amount_invalid".to_string()),
                             };
+
                         let polarity = entry_row
                             .get("ISDEEMEDPOSITIVE")
                             .filter(|value| !value.trim().is_empty())
@@ -1226,6 +1304,9 @@ fn parse_voucher_rows(
                             !tally_entry_polarity_agrees(parsed, is_deemed_positive)
                         }) {
                             parsed_entry["polarity_disagrees_with_amount"] = Value::Bool(true);
+                        }
+                        if entry_composite {
+                            parsed_entry["currency_composite"] = Value::Bool(true);
                         }
                         entries.push(parsed_entry);
                     }

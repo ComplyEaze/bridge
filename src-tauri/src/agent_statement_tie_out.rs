@@ -5,6 +5,7 @@
 //! at the same time can be refused as lock-busy, and it can be refused by theirs;
 //! nothing waits, so nothing deadlocks. A whole statement, or a window of
 //! whole calendar months. See `docs/agent/README.md` ("Statement tie-out").
+use super::failure_code::{FailureCode, ProposalsCode, ReadCode, TieOutCode};
 use super::*;
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::proposals::{
@@ -81,45 +82,42 @@ impl NotEstablished {
 struct BankSide(ExactDecimal);
 
 impl BankSide {
-    fn canonical(value: ExactDecimal) -> Result<Self, String> {
+    fn canonical(value: ExactDecimal) -> Result<Self, FailureCode> {
         ExactDecimal::zero()
             .checked_add(&value)
             .map(Self)
-            .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())
+            .map_err(|_| TieOutCode::ArithmeticOutOfRange.into())
     }
 
     /// A figure as the statement prints it, or an entry of the file read the
     /// same way (a debit to the bank ledger is money in).
-    fn from_printed(text: &str) -> Result<Self, String> {
-        Self::canonical(
-            ExactDecimal::parse(text).map_err(|_| "proposals_file_invalid".to_string())?,
-        )
+    fn from_printed(text: &str) -> Result<Self, FailureCode> {
+        Self::canonical(ExactDecimal::parse(text).map_err(|_| ProposalsCode::FileInvalid)?)
     }
 
     /// The one conversion from Tally's sign, where a debit balance is negative.
-    fn from_book(native: &str) -> Result<Self, String> {
-        let native =
-            ExactDecimal::parse(native).map_err(|_| "ledger_opening_invalid".to_string())?;
+    fn from_book(native: &str) -> Result<Self, FailureCode> {
+        let native = ExactDecimal::parse(native).map_err(|_| TieOutCode::LedgerOpeningInvalid)?;
         Self::canonical(
             ExactDecimal::zero()
                 .checked_subtract(&native)
-                .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
+                .map_err(|_| TieOutCode::ArithmeticOutOfRange)?,
         )
     }
 
-    fn plus(&self, other: &Self) -> Result<Self, String> {
+    fn plus(&self, other: &Self) -> Result<Self, FailureCode> {
         Self::canonical(
             self.0
                 .checked_add(&other.0)
-                .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
+                .map_err(|_| TieOutCode::ArithmeticOutOfRange)?,
         )
     }
 
-    fn minus(&self, other: &Self) -> Result<Self, String> {
+    fn minus(&self, other: &Self) -> Result<Self, FailureCode> {
         Self::canonical(
             self.0
                 .checked_subtract(&other.0)
-                .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
+                .map_err(|_| TieOutCode::ArithmeticOutOfRange)?,
         )
     }
 
@@ -216,13 +214,11 @@ struct StatementFile {
 impl StatementFile {
     /// Every field is parsed here, once, and a file that cannot be read is
     /// `proposals_file_invalid`: an empty or unreadable figure is not zero.
-    fn read(document: &Value) -> Result<Self, String> {
-        fn text(value: &Value) -> Result<&str, String> {
-            value
-                .as_str()
-                .ok_or_else(|| "proposals_file_invalid".to_string())
+    fn read(document: &Value) -> Result<Self, FailureCode> {
+        fn text(value: &Value) -> Result<&str, FailureCode> {
+            value.as_str().ok_or(ProposalsCode::FileInvalid.into())
         }
-        let invalid = || "proposals_file_invalid".to_string();
+        let invalid = || FailureCode::from(ProposalsCode::FileInvalid);
         let bank_ledger = text(&document["bank_ledger"])?.to_string();
         let proposals_net = proposals_net(document, &bank_ledger)?;
         let rows_without_voucher = document["records"]
@@ -255,8 +251,8 @@ impl StatementFile {
 /// Where the parse said the file may be compared with the book. A file that
 /// records no window, or a window that cannot be compared, is a typed result;
 /// one whose window is malformed, or half present, is refused.
-fn recorded_window(document: &Value) -> Result<Result<Edges, NotEstablished>, String> {
-    let invalid = || "proposals_file_invalid".to_string();
+fn recorded_window(document: &Value) -> Result<Result<Edges, NotEstablished>, FailureCode> {
+    let invalid = || FailureCode::from(ProposalsCode::FileInvalid);
     let Some(window) = document.get("window") else {
         return Ok(Err(NotEstablished::WindowNotRecorded));
     };
@@ -355,8 +351,8 @@ fn recorded_window(document: &Value) -> Result<Result<Edges, NotEstablished>, St
 /// What the file's vouchers add to the bank ledger: a debit to it is money in,
 /// a credit is money out. A leg on any other ledger, or on a name that only
 /// resembles the bank ledger, counts for nothing.
-fn proposals_net(document: &Value, bank_ledger: &str) -> Result<BankSide, String> {
-    let invalid = || "proposals_file_invalid".to_string();
+fn proposals_net(document: &Value, bank_ledger: &str) -> Result<BankSide, FailureCode> {
+    let invalid = || FailureCode::from(ProposalsCode::FileInvalid);
     let mut net = BankSide::from_printed("0")?;
     for voucher in document["vouchers"].as_array().ok_or_else(invalid)? {
         for entry in voucher["entries"].as_array().ok_or_else(invalid)? {
@@ -391,17 +387,17 @@ impl LedgerRead {
     /// this check can read, and a row without an opening is not read as zero
     /// (`ledger_opening_missing` is the typed error for a malformed read; the
     /// native reader already refuses such a row).
-    fn of(ledgers: &[TallyLedger], name: &str) -> Result<Self, String> {
+    fn of(ledgers: &[TallyLedger], name: &str) -> Result<Self, FailureCode> {
         let mut found = ledgers.iter().filter(|ledger| ledger.name == name);
         match (found.next(), found.next()) {
             (None, _) => Ok(Self::Absent),
             (Some(ledger), None) => ledger
                 .opening_balance
                 .as_deref()
-                .ok_or_else(|| "ledger_opening_missing".to_string())
+                .ok_or(TieOutCode::LedgerOpeningMissing.into())
                 .and_then(BankSide::from_book)
                 .map(Self::Present),
-            _ => Err("ledger_name_duplicated_in_catalogue".to_string()),
+            _ => Err(TieOutCode::LedgerNameDuplicated.into()),
         }
     }
 }
@@ -412,14 +408,12 @@ impl LedgerRead {
 /// edit to the ledger itself, made between the first and the third read; a
 /// voucher dated inside the window and posted in between moves only the end
 /// figure, and is not caught.
-fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], String> {
+fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], FailureCode> {
     let tally = |date: Date| {
-        TallyDate::parse(date.iso().replace('-', "")).map_err(|_| "invalid_date".to_string())
+        TallyDate::parse(date.iso().replace('-', "")).map_err(|_| ReadCode::InvalidDate)
     };
     let first = tally(first)?;
-    let after_last = tally(last)?
-        .next_day()
-        .map_err(|_| "invalid_date".to_string())?;
+    let after_last = tally(last)?.next_day().map_err(|_| ReadCode::InvalidDate)?;
     Ok([first.clone(), after_last, first])
 }
 
@@ -431,7 +425,7 @@ fn gaps(
     file: &StatementFile,
     reads: &[LedgerRead; 3],
     partly_posted: bool,
-) -> Result<Gaps, String> {
+) -> Result<Gaps, FailureCode> {
     let (start, end) = match reads {
         [LedgerRead::Absent, LedgerRead::Absent, LedgerRead::Absent] => {
             return Ok(all_not_established(NotEstablished::BankLedgerNotInBook))
@@ -596,8 +590,7 @@ impl Server {
             .map_err(|_| "argument_invalid:stage".to_string())?;
         let document = bank_statement::load_proposals(
             &self.settings.data_dir,
-            args.get("proposals_id")
-                .ok_or_else(|| "proposals_id_required".to_string())?,
+            args.get("proposals_id").ok_or(ProposalsCode::IdRequired)?,
             args.get("proposals_sha256"),
         )?;
         let file = StatementFile::read(&document)?;
@@ -612,7 +605,7 @@ impl Server {
                         company
                             .books_from
                             .as_deref()
-                            .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                            .ok_or(ReadCode::CompanyIdentityIncomplete)?,
                     )?;
                     let first_day = normalized_date(&first.iso())?;
                     let gaps = if ensure_movement_window_within_books(&first_day, &books_from)

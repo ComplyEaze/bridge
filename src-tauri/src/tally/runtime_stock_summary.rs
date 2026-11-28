@@ -138,15 +138,53 @@ pub(crate) fn stock_summary_period(
     today: &TallyDate,
 ) -> Result<NativeLedgerSnapshotPeriod, StockSummaryReadError> {
     let as_of = as_of.date();
+    admit_as_of(as_of, books_from, today)?;
+    let start = financial_year_start(as_of).ok_or(StockSummaryReadError::PeriodNotHonoured)?;
+    NativeLedgerSnapshotPeriod::new(profile, start.max(books_from.clone()), as_of.clone())
+        .map_err(|_| StockSummaryReadError::PeriodNotHonoured)
+}
+
+/// The two bounds every stock read's end date meets: not before the book's
+/// start, and not after the host's today.
+fn admit_as_of(
+    as_of: &TallyDate,
+    books_from: &TallyDate,
+    today: &TallyDate,
+) -> Result<(), StockSummaryReadError> {
     if as_of < books_from {
         return Err(StockSummaryReadError::AsOfBeforeBooks);
     }
     if as_of > today {
         return Err(StockSummaryReadError::AsOfInFuture);
     }
-    let start = financial_year_start(as_of).ok_or(StockSummaryReadError::PeriodNotHonoured)?;
-    NativeLedgerSnapshotPeriod::new(profile, start.max(books_from.clone()), as_of.clone())
-        .map_err(|_| StockSummaryReadError::PeriodNotHonoured)
+    Ok(())
+}
+
+/// The window a statement's own Stock Summary is read over for #692's rule 2:
+/// the statement's window, admitted only in the shape `stock_summary` reads,
+/// from the 1 April that opens a financial year to a month's last day in that
+/// year ([`StockSummaryAsOf`], [`financial_year_start`]), within `stock_summary`'s
+/// two bounds: starting no earlier than the book and ending no later than the
+/// host's today. Any other window, two years together or a half-year from
+/// October included, builds nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StatementStockWindow(NativeLedgerSnapshotPeriod);
+
+impl StatementStockWindow {
+    pub(crate) fn of(
+        period: &NativeLedgerSnapshotPeriod,
+        books_from: &TallyDate,
+        today: &TallyDate,
+    ) -> Option<Self> {
+        let as_of = StockSummaryAsOf::new(period.to().clone()).ok()?;
+        admit_as_of(as_of.date(), books_from, today).ok()?;
+        (financial_year_start(as_of.date())? == *period.from() && period.from() >= books_from)
+            .then(|| Self(period.clone()))
+    }
+
+    pub(crate) fn period(&self) -> &NativeLedgerSnapshotPeriod {
+        &self.0
+    }
 }
 
 fn budget_bytes() -> u64 {
@@ -315,7 +353,7 @@ async fn count_by_span<C: CensusCollection + Copy>(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
     mark: u64,
-    render: fn(&str, &CensusSlice<C>) -> String,
+    render: fn(&ValidatedCompanyName, &CensusSlice<C>) -> String,
     parse: fn(&str, &str, u64) -> Result<Vec<String>, StandardLedgerCatalogError>,
     none_is_a_count: bool,
     evidence: &mut RuntimeReadEvidence,
@@ -326,7 +364,7 @@ async fn count_by_span<C: CensusCollection + Copy>(
     let plan = CensusPlan::<C>::new(mark, STOCK_CENSUS_LIMITS).map_err(refused)?;
     let mut census = Census::new(plan);
     while let Some(slice) = census.next_slice() {
-        let request = render(identity.display_name(), &slice);
+        let request = render(identity.company_name(), &slice);
         let (body, bytes, sha256) = client.fetch_census_slice(request.clone()).await?;
         *evidence = evidence
             .clone()
@@ -507,7 +545,7 @@ impl TallyRuntime {
                         stock_summary_period(profile, &as_of, extent.books_from(), &today)?;
 
                     let request = render_company_inventory_flags_request(
-                        identity.display_name(),
+                        identity.company_name(),
                         identity.company_guid_value(),
                     );
                     let (xml, bytes, hash) = client
@@ -543,7 +581,7 @@ impl TallyRuntime {
                     .await?;
 
                     let request =
-                        render_native_stock_summary_request(identity.display_name(), &period);
+                        render_native_stock_summary_request(identity.company_name(), &period);
                     let (xml, bytes, hash) = client
                         .fetch_native_report_paired(request.clone())
                         .await?

@@ -2622,6 +2622,36 @@
       "size": 2994
     },
     {
+      "blob": "1f9567473a026a629397c00a0adb81251564c94e",
+      "capture_id": "pilot-lab-ledger-rates-svc.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-rw-answers at 58c3eb0f3482, file rates.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row 2162-RW)",
+      "sha256": "182f598aafaf333bc8284b6976e664cee00af1eadb5a29bd4f73c295f8601e08",
+      "size": 2874
+    },
+    {
+      "blob": "ca7b0eac02e6c71625b39bd69fccdeb2e51e9242",
+      "capture_id": "pilot-lab-ledger-rates-svc.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-rw-answers at 58c3eb0f3482, file reads/a-A0-rates.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row 2162-RW)",
+      "sha256": "a6197d9082955c5b3fc8fe9a95d2edf385b801b51a6f756c463b6cd3af215b62",
+      "size": 29114
+    },
+    {
+      "blob": "152fe2fd5fe52a7c032f8a2570fbe5c74a89c8f4",
+      "capture_id": "pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-rw-answers at 58c3eb0f3482, file reads/a-A1c-pre-rates.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row 2162-RW)",
+      "sha256": "d7f5db99170ea9a643fab195a9465bd20d1f1af1102b76fbefaefe6673a12257",
+      "size": 30626
+    },
+    {
       "blob": "6edab57ba8c6986983092bbb284f16cdad7e140a",
       "capture_id": "stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
       "company": "BRIDGE SHAPE LAB",
@@ -4342,6 +4372,26 @@
       "size": 3024
     },
     {
+      "blob": "0ef93c693aec99920ecd78b20e2f5cef597c34e6",
+      "capture_id": "pilot-lab-number-0010-held-once.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-st-answers at dd3d85a2, file lab/2162-st-answers/answers/a-s2-N-0010s.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row ST)",
+      "sha256": "850c2b166e02c2666a9e5c9807646ff2b9d2e8cdc68f7ff2af21b71bc45b1e85",
+      "size": 5604
+    },
+    {
+      "blob": "d62568f3cb87da72479524892dc5de0ba5d8819d",
+      "capture_id": "pilot-lab-number-0010-two-sales-types.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-st-answers at dd3d85a2, file lab/2162-st-answers/answers/a-s4r-N-0010s.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row ST)",
+      "sha256": "01086f928399b4ed0bc316c453dd4e08f393e123a201967d557076707ba5100d",
+      "size": 8206
+    },
+    {
       "blob": "618661e6a514b5d123984f50d10ee803f9008cfd",
       "capture_id": "pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
       "company": "BRIDGE PILOT LAB",
@@ -4350,6 +4400,26 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row S4)",
       "sha256": "09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874",
       "size": 538
+    },
+    {
+      "blob": "0008bfeeaf5aeb36e43a2e16a46aebedff2efa70",
+      "capture_id": "pilot-lab-invoice-readback-item-line.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/1379-it-answers at a5b9d603, file lab/1379-it-answers/answers/a-s4r-R-0093.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#1379 row IT)",
+      "sha256": "dff8c724dd8c70811e99340e38fe003331a2c8a8569ed01d30a9d1d04aa4de0a",
+      "size": 90662
+    },
+    {
+      "blob": "04c0a8d26ba52afc8f9bdac2ee7769dec95ebfa3",
+      "capture_id": "pilot-lab-invoice-readback-registration-empty-gstin.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2464-rb-answers at afe4fbad, file lab/2464-rb-answers/answers/a-s5r-RC-0105.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-registration-empty-gstin.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2464 row RB)",
+      "sha256": "5e4b0537c33d4d87ed53e37cee5162db1db7ccbe6eea41cf30d0f2c89a4f3265",
+      "size": 88208
     },
     {
       "blob": "51acf6f00227a80e1677a73f88daaaea3ed04156",
@@ -5492,6 +5562,16 @@
       "size": 1636
     },
     {
+      "blob": "89381fb500c92fe95e6122f7a3b9af55ccfdbdb7",
+      "capture_id": "ledger-snapshot-supplier-rj-20260731.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2377-nb-answers at 61a5c1bf, file answers/a-s2-S-snap-20260401-20260731.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-snapshot-supplier-rj-20260731.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2377",
+      "sha256": "552bc05e5ff566f3b51372b3bd5e9f3ce56e1b49b40aa12e4b0585dfeaac423f",
+      "size": 25298
+    },
+    {
       "blob": "95f179b38fe053953ac91ccf516d117112cb9ff1",
       "capture_id": "r1-groups.utf16le.xml",
       "company": "BRIDGE TIEOUT E",
@@ -5590,6 +5670,576 @@
       "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
       "sha256": "b2d0519cc1d25b5eac8a0ddc15318d58818fa9aaba97e4bf3ac81a87785f533f",
       "size": 13532
+    },
+    {
+      "blob": "e164f1d5b0c329b6d579738f92c1ac758fca458d",
+      "capture_id": "native/ledgers_native_forexgroup_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-lm-answers at f832eb17, file answers/a-lx1-X-lx1-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "898ad76bf159ec8676deaefe4cf2a01672e297de5945bab4c924365705ccace3",
+      "size": 11556
+    },
+    {
+      "blob": "b94d8bba94b810104671a200428e2ca2d06ba83f",
+      "capture_id": "native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-op-answers at fb7125ad, file answers/a-x1-X-lx1-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fc69af7076469b26ad111eac385e7ab875951c6527ff1bbc9102a6d12e2d8962",
+      "size": 12678
+    },
+    {
+      "blob": "084bee8d377925eebca98c51fa304c3872d4f0c5",
+      "capture_id": "native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-tb-answers at 154a0ca3, file answers/a-tb1-T-tb1-20250401-20250430.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1c4638e8df640575eff3e4955bed2d9783026fe7817ad73e63e05f19277fb7b7",
+      "size": 14140
+    },
+    {
+      "blob": "ff99da39188f0e2d3d0d27006f94c28da89d5f11",
+      "capture_id": "native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-op-answers at fb7125ad, file answers/a-t1-T-tb1-20250401-20250430.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "13ae13a58f8867e80070a3a5aa43eeabce8fc25cf1c2d225c66620de8617c283",
+      "size": 15526
+    },
+    {
+      "blob": "f0ff5990f67c1a5b4b5c01e3853cf60125f4431e",
+      "capture_id": "agent/movement-forexgroup-book-20250401.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-lm-answers at f832eb17, file answers/a-mv-V-mv-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/movement-forexgroup-book-20250401.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "56554b6a655a92afc74f28527484647098f8cf43e774142d8caa5eb7736f4df7",
+      "size": 59524
+    },
+    {
+      "blob": "5c0281b767d6b7a898c0e1e5a93a9e21d74a229c",
+      "capture_id": "agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-lm-answers at f832eb17, file answers/a-mvl-V-mvl-usd-customer-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bff19938fc345fadb76af9e2b1924309976837475e1d3777e875b5ccd6349443",
+      "size": 23720
+    },
+    {
+      "blob": "b06d0283f9686677ba3789ad0eb21d507e6f50c8",
+      "capture_id": "native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-ld-answers at e38d2b82, file answers/a-tb3-T-tb3-20250401-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a12217b840ec71c5f68a6f646c10625f3f554bdd09c591d113c9667177b97705",
+      "size": 13528
+    },
+    {
+      "blob": "36d04896ecc00dd12caddc841a1e761cb84eaf4a",
+      "capture_id": "ledger-snapshot-2480-ns-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-s6sa-S-snap-20260401-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-snapshot-2480-ns-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "6338e8c0eca34346065898d02fce949b988917aad5a4a3bd6283dfe911d05462",
+      "size": 39154
+    },
+    {
+      "blob": "4946ac7be44d1948fb05e7cfc2c32fda29562cd6",
+      "capture_id": "ledger-outstandings-2480-ns-hy-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r2a-L-lo-hy-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-hy-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "9106fcd53bad280111db32938332c7da1f1a8831ac5371cc4e78523bf29ef1b4",
+      "size": 896
+    },
+    {
+      "blob": "6384bdccfe658b82fee5b1635e192177d210e763",
+      "capture_id": "ledger-outstandings-2480-ns-hy-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-hy-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-hy-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "96a30cfec7f48c6cc1bdbc5208a108e7ca96fd9ad543804305a53c13907f21c3",
+      "size": 820
+    },
+    {
+      "blob": "da0a2c8207206e251933135086118fd65e6bacec",
+      "capture_id": "ledger-outstandings-2480-ns-dt-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r3a-L-lo-dt-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-dt-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "81c33e352aaa4a406041e112373a6b91a3d52a25da0a811939adb07dae63da34",
+      "size": 896
+    },
+    {
+      "blob": "fb3a12af2624902cdab6c5170777b8107afc81be",
+      "capture_id": "ledger-outstandings-2480-ns-dt-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-dt-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-dt-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "8cbdddd9e41f685d1e6e05862f1a7bb502d07abd7001559117e66265a14d5064",
+      "size": 820
+    },
+    {
+      "blob": "b3351cd5e30091c6e16d417ea3712163cb647ac4",
+      "capture_id": "ledger-outstandings-2480-ns-am-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r4a-L-lo-am-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-am-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "7105759d757e21ba5281ea1ef859545698446ce4f77b047034021da348fac98b",
+      "size": 896
+    },
+    {
+      "blob": "a19da7c229be3f1bc57cb47987983e66611749b0",
+      "capture_id": "ledger-outstandings-2480-ns-am-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-am-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-am-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "6614d844e8afea67cf5baeb1223641c149f20b46d70adae73db186cbc693f580",
+      "size": 828
+    },
+    {
+      "blob": "2bd69d70ed67c3269aa820875dffd75f210e20bb",
+      "capture_id": "ledger-outstandings-2480-ns-sl-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r5a-L-lo-sl-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-sl-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "59ef6d45929487f74b4c85e653bbfc9526133927e026e593a6c09be27f17e2ec",
+      "size": 896
+    },
+    {
+      "blob": "8c805ad7039f935d0b34764ef3586e8f1730da44",
+      "capture_id": "ledger-outstandings-2480-ns-sl-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-sl-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-sl-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "249fe7bf1a9843ccdcd939f0a7aefc95fac7a456da7e4631749597d65917f8cf",
+      "size": 820
+    },
+    {
+      "blob": "b9def04e3fd5418f239b652cff1fbc811a958ac7",
+      "capture_id": "ledger-outstandings-2480-ns-lp-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r6a-L-lo-lp-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-lp-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "dfca8eb42cf152e96ba8c6c75de5c385f53cb9461a1bcf61235349270fa971b4",
+      "size": 896
+    },
+    {
+      "blob": "78a353a3693c2dee4c6b2411ecf1258b3dd3fa84",
+      "capture_id": "ledger-outstandings-2480-ns-lp-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-lp-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-lp-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "a9b9d905d53332f3eaa3b2e781a921a5f220cc5276dfd901de362d0ddaf08d6d",
+      "size": 820
+    },
+    {
+      "blob": "e9bb7f28d5f083f297ce545b0ed25e6d35bf6b55",
+      "capture_id": "ledger-outstandings-2480-ns-rp-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r7a-L-lo-rp-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-rp-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "6b1e1ad206f91b0e9a2dd37e812f79ceeb30b8bdac90ea4f2d33c36d773bfa84",
+      "size": 896
+    },
+    {
+      "blob": "2d79de1837c96d7d621af7106fe9f56d78c88673",
+      "capture_id": "ledger-outstandings-2480-ns-rp-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-rp-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-rp-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "e23c683e1e41f5cb06bbc5acdecd806d845a6e86c94bd713e28d2b2303f8d42e",
+      "size": 820
+    },
+    {
+      "blob": "1ec7d651f9fdffb0e551f4d1c11a41d5d06f1194",
+      "capture_id": "ledger-outstandings-2480-ns-ap-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r8a-L-lo-ap-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-ap-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "099644837f6f566193215369d20a2ef0eb40beabe1f0e7b94d84ddc8f40e3a3d",
+      "size": 896
+    },
+    {
+      "blob": "5a6235ed6c4a926c6671aa114a24b62053ef26ab",
+      "capture_id": "ledger-outstandings-2480-ns-ap-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-ap-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-ap-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "dcfff48069d1960e1895a4eb700d939c2889b63cadac43d8b8fe75e6b36843b6",
+      "size": 830
+    },
+    {
+      "blob": "54d5727c6399a50d97c4126642f1f786bde844f6",
+      "capture_id": "ledger-outstandings-2480-ns-op-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r9a-L-lo-op-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-op-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "15fbc04f4a9f48a0467dd405d869fe59cf16b4fc4fb6106fe61f3d7f10f1787d",
+      "size": 896
+    },
+    {
+      "blob": "e98a16e4f959b4aafca5a3cf56470c7f82baa50a",
+      "capture_id": "ledger-outstandings-2480-ns-op-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-op-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-op-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "940d4308878b55efa99586101b45b3628c809662a3bf7bde2d499f02c153d0f0",
+      "size": 828
+    },
+    {
+      "blob": "8848e5da81952bce75bee9738449b5be00b85941",
+      "capture_id": "ledger-outstandings-2480-ns-dd-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r10a-L-lo-dd-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-dd-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "2b4b8b82e2d97c5e9723498a52cf88ea3ded2c4a2466a796b348c37284dc3c95",
+      "size": 896
+    },
+    {
+      "blob": "a847b2debe84a8c9eb49772913f3690085d7411a",
+      "capture_id": "ledger-outstandings-2480-ns-dd-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-dd-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-dd-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "2b364be4cecccac7ccf79ad07c0eef993b11d268bb3e2d6cc72d6871a6ffdddc",
+      "size": 824
+    },
+    {
+      "blob": "ca9b1bddde0cd329c026e538523b14fb0ef7e6fe",
+      "capture_id": "ledger-outstandings-2480-ns-sc-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-answers at 24951ffb, file answers/a-r11a-L-lo-sc-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-sc-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "b9ca8c484b1fcb6ab4b1de9f3acc527a524a2c90b39bdf8c0aaf135b54955465",
+      "size": 896
+    },
+    {
+      "blob": "f01effab34ff165308b5a69ff39b6c628a3e5a0b",
+      "capture_id": "ledger-outstandings-2480-ns-sc-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-ns-sheet at 6e44a3dc, file L-lo-sc-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-sc-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "e019f0ab21f2714a24d9491f83bf8312b34971b3dbecb766875a84b38c2dfb81",
+      "size": 822
+    },
+    {
+      "blob": "7065a3e10622dd131356de3a353ba987be89ba07",
+      "capture_id": "ledger-snapshot-2480-nx-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-s6sa-S-snap-20260401-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-snapshot-2480-nx-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "ee6c660ecf8b292374de172cfbe729fc6e7613e5b47f0926cbdc78b150528e65",
+      "size": 39182
+    },
+    {
+      "blob": "e890e0d71759ecf1d3f23b557a58dc7faf6b24ba",
+      "capture_id": "ledger-outstandings-2480-nx-cm-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r2a-L-lo-cm-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-cm-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "ffc0820068ca9fee973dcaa17b38fe2f6161848faba94c321dfcc622f5725b58",
+      "size": 896
+    },
+    {
+      "blob": "477ac3c6053c77c88039b851992d2bffb2c95abd",
+      "capture_id": "ledger-outstandings-2480-nx-cm-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-cm-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-cm-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "d1fc1f8f1951f373ca1168a2c66b333ac9ced1927edc8f19dd16cc7ea6ca6244",
+      "size": 822
+    },
+    {
+      "blob": "1c74ca28b9e29268d822462e87311108e8223d8e",
+      "capture_id": "ledger-outstandings-2480-nx-us-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r3a-L-lo-us-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-us-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "d7abfed5a7e2352a1a423a20392355c981e7f9f7360ce782d3dd140770ffe900",
+      "size": 896
+    },
+    {
+      "blob": "5986f4ab4b1ccb80e00e585e0cc1b585256aca56",
+      "capture_id": "ledger-outstandings-2480-nx-us-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-us-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-us-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "cd11c44291b6f80101d99793ab45b1c2c67fb962dfadc6ef877b6027feaa73bf",
+      "size": 820
+    },
+    {
+      "blob": "853e8c8f81d87517d40eaaeca0aa9c7ebf29c100",
+      "capture_id": "ledger-outstandings-2480-nx-dq-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r4a-L-lo-dq-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-dq-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "3b313034c1e95ea0f726009ff4b0d3a059a9206159d8bc2de5235deb61d5519d",
+      "size": 896
+    },
+    {
+      "blob": "1c255b41c32ddfd7da8a340ce05a0a54cb8a53da",
+      "capture_id": "ledger-outstandings-2480-nx-dq-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-dq-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-dq-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "20c5052fd517c39dde0f7de860ad8e242cc0e3f1ff3c491adefc75af02a64ff5",
+      "size": 844
+    },
+    {
+      "blob": "c3b55cc1a631ec3f24d3cb3d394b6cff6eaee920",
+      "capture_id": "ledger-outstandings-2480-nx-ps-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r5a-L-lo-ps-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ps-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "d908e7593f001f4f8fa6c92ef63a3f7f3226edd8f5c8118731645c7e9d93b5f9",
+      "size": 896
+    },
+    {
+      "blob": "e9a2f1ade9b3c78e4384311f667c30105cfde3fd",
+      "capture_id": "ledger-outstandings-2480-nx-ps-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-ps-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ps-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "03d689746bb523fb0e08005b93b47e99b17d9c7477fbec64d1e1cfa67e9bda1b",
+      "size": 824
+    },
+    {
+      "blob": "d76c1f217338355232ada579f1a64171fb230871",
+      "capture_id": "ledger-outstandings-2480-nx-at-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r6a-L-lo-at-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-at-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "22ad6aa26c058043816ded8324ae45dfe7a7cf8aa93af9ad698d3777e23564a7",
+      "size": 896
+    },
+    {
+      "blob": "d6bcb8768b64ff7157e08e7471deb4d04e913e23",
+      "capture_id": "ledger-outstandings-2480-nx-at-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-at-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-at-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "956f16a1e08a21ffd7016e863f443d71a35af44b0c3f1b6c437d6ce8cc33a5cf",
+      "size": 824
+    },
+    {
+      "blob": "561c098557b575f4107710be806bfd2c0606a0f0",
+      "capture_id": "ledger-outstandings-2480-nx-hs-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r7a-L-lo-hs-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-hs-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "01707a6b3dbc5bf469c72408552fead2bd353d82b004c1a3d73e7e55c09ff3df",
+      "size": 896
+    },
+    {
+      "blob": "3bc54ed3500ab3ebbb9738791b0e3fb50a6d46ab",
+      "capture_id": "ledger-outstandings-2480-nx-hs-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-hs-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-hs-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "203e451fa88bfc8de5fb6a52809ac46da9c02d72e1c14d5649d5a916e2c5f5b1",
+      "size": 822
+    },
+    {
+      "blob": "16855476fa7c64e4454d6f5eaad7d03bcbf11745",
+      "capture_id": "ledger-outstandings-2480-nx-cl-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r8a-L-lo-cl-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-cl-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "cd3946a9310c5f5b02988bc6c678601a321902674c769e2300ffc1b1d689e73d",
+      "size": 896
+    },
+    {
+      "blob": "6eb521f15f1822b17f29e49d4fd456e14afeec0c",
+      "capture_id": "ledger-outstandings-2480-nx-cl-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-cl-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-cl-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "53402b3e0a2a1c3ec629be3ad24594ddf19ba00e53203035c370f4d3bfe040fc",
+      "size": 822
+    },
+    {
+      "blob": "712cc353cc1f5b0d52dc9d63906e96ab3150ebce",
+      "capture_id": "ledger-outstandings-2480-nx-pc-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r9a-L-lo-pc-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-pc-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "f3973ccc1acb2708af11ed361d494d760eb0dd07059b5586bc9928f2da4bf42a",
+      "size": 896
+    },
+    {
+      "blob": "a1a308805419fa5e5d420be82140ef34cda15c31",
+      "capture_id": "ledger-outstandings-2480-nx-pc-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-pc-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-pc-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "aaccaf538744f01cb344b08b08cc20ab0992808724ffe3977c4556b82829660b",
+      "size": 828
+    },
+    {
+      "blob": "c9731e60eaf3e71b1a90f9201870b9242e1f37e5",
+      "capture_id": "ledger-outstandings-2480-nx-st-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r10a-L-lo-st-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-st-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "beaea943a92fb4c5544137fa5edac1b836def53d56199e40ad076d092751bbf3",
+      "size": 896
+    },
+    {
+      "blob": "8fbe6ce516a501b96d7b8319373012836393d6fd",
+      "capture_id": "ledger-outstandings-2480-nx-st-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-st-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-st-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "0e8e0517a400f680b68f9d9be17a32e2efdf315e75636d76f1afb27f5673bd20",
+      "size": 824
+    },
+    {
+      "blob": "68129faf866984cb65037fd9e6b38018d20020e7",
+      "capture_id": "ledger-outstandings-2480-nx-ex-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-answers at ea691186, file answers/a-r11a-L-lo-ex-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ex-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "388027a631c89db43765e121c70e8c4b5c26ce3de1d82d00ff5e71772c49c34d",
+      "size": 896
+    },
+    {
+      "blob": "83ef3b4005c78676a1b62b1e8e0f6d9eb1968c93",
+      "capture_id": "ledger-outstandings-2480-nx-ex-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nx-sheet at ea84bcdf, file L-lo-ex-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ex-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "99d2bc332f205a2d4fde687088b68e69dd84f3d3f309b8326051e8d2b9cd47e6",
+      "size": 816
+    },
+    {
+      "blob": "a100dc99cb4852da195ecfa81da97359760aefef",
+      "capture_id": "ledger-snapshot-2480-nc-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nc-answers at 2ce5b6ea, file answers/a-s6sa-S-snap-20260401-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-snapshot-2480-nc-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "08b7edd1249e2d60739c4d41b04c63792fac32ebbf11e98698af9c344de47b42",
+      "size": 39634
+    },
+    {
+      "blob": "09cf90dcb3f093d0f43af3b5e5d28ff966ecc636",
+      "capture_id": "ledger-outstandings-2480-nc-sm-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nc-answers at 2ce5b6ea, file answers/a-r8a-L-lo-sm-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nc-sm-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "53d5013677dbf904a9fd53ac89531dcecae4c683ac4ba6889f2304c7fd303683",
+      "size": 896
+    },
+    {
+      "blob": "a9f142811cf0e3672f2e299a291d85f9e5854096",
+      "capture_id": "ledger-outstandings-2480-nc-sm-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nc-sheet at 8eb5012c, file L-lo-sm-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nc-sm-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "014bbfe48101e5b46a8139f4f20fed06598a448cd5bc179b507f8284a4f581b9",
+      "size": 842
+    },
+    {
+      "blob": "ddbe2f506963f339817a90456f2586866363fb62",
+      "capture_id": "ledger-outstandings-2480-nc-al-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nc-answers at 2ce5b6ea, file answers/a-r10a-L-lo-al-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nc-al-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "ade384af03dad64a8c69fecc00e1aa54f29683575f18756546d6149fbfbb20a7",
+      "size": 896
+    },
+    {
+      "blob": "e105207f9954f306d2084ba3e5e4634c89e6ec05",
+      "capture_id": "ledger-outstandings-2480-nc-al-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-nc-sheet at 8eb5012c, file L-lo-al-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-nc-al-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "ebe7473a88961ac74f64eaeff5fce6d937f10a7bb7ee4bfd37de2ca7d829fe76",
+      "size": 900
+    },
+    {
+      "blob": "2413839065c5880f0b0c4d60902391bb43462712",
+      "capture_id": "ledger-snapshot-2480-mx-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-mx-answers at e88cd036, file answers/a-s6sa-S-snap-20260401-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-snapshot-2480-mx-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "3f6f6c67ff1730c09dc16c9a0904a28440e5ae69d4b38a40f2bbe69ec972dfff",
+      "size": 39750
+    },
+    {
+      "blob": "24a3f8ed66d9ebbdfa1dcab4c3b122fb590380d1",
+      "capture_id": "ledger-outstandings-2480-mx-al-20260801.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-mx-answers at e88cd036, file answers/a-r11a-L-lo-al-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-mx-al-20260801.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "7a04c15692e5c806e3a267b56c5b5b4b0ebf03cf35264840acc2d0b08cf10219",
+      "size": 896
+    },
+    {
+      "blob": "ebd26fc8b273f004706ef649a28303fa8c84c7b4",
+      "capture_id": "ledger-outstandings-2480-mx-al-20260801.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2480-mx-sheet at 080692b7, file L-lo-al-20260801.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-2480-mx-al-20260801.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2480",
+      "sha256": "ae355b8f8639f04a79e4a3010559df92ed9b505c5fbad5c7d06a64f1d446a498",
+      "size": 972
     }
   ]
 }

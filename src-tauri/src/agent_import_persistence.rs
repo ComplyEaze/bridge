@@ -27,6 +27,11 @@ fn create_transaction(path: &Path) -> std::io::Result<()> {
 /// and before it exists nothing is published. `remove_dir` removes only an empty
 /// folder, so a marker still holding anything keeps refusing (#2269).
 pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
+    settled(imports).map_err(String::from)
+}
+
+/// [`require_settled`], refusing with the code itself.
+pub(super) fn settled(imports: &Path) -> Result<(), &'static str> {
     for (name, error_code) in [
         (TRANSACTION, "proof_publication_recovery_required"),
         (BUILD_TRANSACTION, "import_publication_recovery_required"),
@@ -42,10 +47,10 @@ pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
                     if error.kind() != std::io::ErrorKind::DirectoryNotEmpty {
                         eprintln!("{name} not cleared: {}", os_cause(&error));
                     }
-                    return Err(error_code.into());
+                    return Err(error_code);
                 }
             },
-            _ => return Err(error_code.into()),
+            _ => return Err(error_code),
         }
     }
     Ok(())

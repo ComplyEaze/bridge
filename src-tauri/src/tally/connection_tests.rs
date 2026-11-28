@@ -93,9 +93,17 @@ fn party_ledger_commitment_hashes_the_three_encoded_builder_requests() {
     )
     .unwrap();
     let requests = [
-        super::render_party_ledger_master_request("Synthetic ₹ Books", &master),
-        super::render_native_ledger_snapshot_request("Synthetic ₹ Books", &balance),
-        super::render_native_group_snapshot_request("Synthetic ₹ Books"),
+        super::render_party_ledger_master_request(
+            &ValidatedCompanyName::new("Synthetic ₹ Books").unwrap(),
+            &master,
+        ),
+        super::render_native_ledger_snapshot_request(
+            &ValidatedCompanyName::new("Synthetic ₹ Books").unwrap(),
+            &balance,
+        ),
+        super::render_native_group_snapshot_request(
+            &ValidatedCompanyName::new("Synthetic ₹ Books").unwrap(),
+        ),
     ];
     let hashes = requests
         .iter()
@@ -126,6 +134,7 @@ use bridge_tally_core::{
 };
 use bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -468,20 +477,44 @@ fn company_identity_normalization_rejects_invalid_and_ambiguous_guids() {
         },
     ])
     .expect("normalize company identities");
-    assert_eq!(normalized[0].name, "Synthetic A");
+    // The name is held as Tally reported it, edge spaces kept (#2433).
+    assert_eq!(normalized[0].name, "  Synthetic A  ");
     assert_eq!(normalized[0].guid.as_deref(), Some("GUID-1"));
     assert!(unique_company_identities(&normalized));
     assert!(!has_presentation_equivalent_guid_siblings(&normalized));
 
-    assert!(
-        normalize_discovered_companies(vec![crate::tally::TallyCompany {
+    // A name a request cannot carry no longer refuses the whole list: the
+    // company stays, named as reported, and its reads refuse (#2433).
+    let kept = normalize_discovered_companies(vec![
+        crate::tally::TallyCompany {
             name: "Synthetic\nCompany".to_string(),
             guid: Some("guid-2".to_string()),
             company_number: None,
             books_from: None,
-        }])
-        .is_err()
+        },
+        crate::tally::TallyCompany {
+            name: "x".repeat(361),
+            guid: Some("guid-3".to_string()),
+            company_number: None,
+            books_from: None,
+        },
+        crate::tally::TallyCompany {
+            name: "Synthetic Company".to_string(),
+            guid: Some("guid-4".to_string()),
+            company_number: None,
+            books_from: None,
+        },
+    ])
+    .expect("an unsendable name keeps the list");
+    assert_eq!(
+        kept.iter()
+            .map(|company| company.name.len())
+            .collect::<Vec<_>>(),
+        [17, 361, 17]
     );
+    assert!(crate::tally::validators::validate_company_name(&kept[0].name).is_err());
+    assert!(crate::tally::validators::validate_company_name(&kept[1].name).is_err());
+    assert!(crate::tally::validators::validate_company_name(&kept[2].name).is_ok());
     assert!(
         normalize_discovered_companies(vec![crate::tally::TallyCompany {
             name: "Synthetic Company".to_string(),
@@ -1004,7 +1037,8 @@ async fn interactive_company_fetch_sends_the_native_collection_request() {
     server.await.expect("synthetic Tally server task");
 
     assert_eq!(companies.len(), 1);
-    assert_eq!(companies[0].name, "Synthetic Company");
+    // Held as Tally reported it, edge spaces kept (#2433).
+    assert_eq!(companies[0].name, "  Synthetic Company  ");
     assert_eq!(companies[0].guid.as_deref(), Some("guid-1"));
 }
 
@@ -1256,7 +1290,8 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
     assert_eq!(probe.companies.len(), 2);
     assert_eq!(probe.companies[0].name, "Synthetic Company A");
     assert_eq!(probe.companies[0].guid.as_deref(), Some("synthetic-guid-a"));
-    assert_eq!(probe.companies[1].name, "synthetic company a");
+    // Held as Tally reported it, edge spaces kept (#2433).
+    assert_eq!(probe.companies[1].name, " synthetic company a ");
     assert_eq!(probe.companies[1].guid.as_deref(), Some("SYNTHETIC-GUID-A"));
     assert_eq!(probe.profile.product, "TallyPrime");
     assert_eq!(probe.profile.mode.as_deref(), Some("Licensed"));
@@ -1291,6 +1326,164 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
     .expect("POST request uses decodable UTF-16 XML");
     assert_company_collection_request_shape(&post_xml.text);
     assert!(post_xml.text.contains("<ID>BridgeCompanyExtent</ID>"));
+}
+
+/// The retained shape-lab company list, as captured, with its one
+/// company, [`SHAPE_LAB_COMPANY_NAME`].
+pub(crate) fn shape_lab_company_list() -> String {
+    const CAPTURE: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/note-days/shape_lab_company_list_response.utf16le.xml"
+    );
+    bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        CAPTURE,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        CAPTURE.len(),
+    )
+    .expect("the shape-lab company list decodes")
+    .text
+}
+
+/// [`shape_lab_company_list`] with a copy of its row after it, under
+/// another GUID and named `second` (in its attribute and its element). Changed
+/// in memory; no fixture is added (#2433). The protocol crate's
+/// `company_list_names` test makes the same change with its own `two_rows`.
+pub(crate) fn shape_lab_company_list_beside(second: &str) -> String {
+    let xml = shape_lab_company_list();
+    // From the row on: `BODY/DESC/CMPINFO` holds an earlier `<COMPANY>0</COMPANY>` counter.
+    let start = xml
+        .find("<COMPANY ")
+        .expect("the capture holds a company row");
+    let end = start
+        + xml[start..]
+            .find("</COMPANY>")
+            .expect("the company row closes")
+        + "</COMPANY>".len();
+    let copy = xml[start..end]
+        .replace(SHAPE_LAB_COMPANY_NAME, second)
+        .replace(
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c347",
+        );
+    let mut out = xml;
+    out.insert_str(end, &copy);
+    out
+}
+
+/// The name of the one company in the shape-lab company list.
+pub(crate) const SHAPE_LAB_COMPANY_NAME: &str = "BRIDGE SHAPE LAB";
+
+/// Answers each request, in order, with the next response, then returns the
+/// method of each request it read. A request that does not come fails the
+/// test after two seconds rather than waiting for ever.
+async fn answer_in_order(
+    responses: Vec<Vec<u8>>,
+) -> (TallyConfig, tokio::task::JoinHandle<Vec<String>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let mut methods = Vec::new();
+        for response in responses {
+            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
+                .await
+                .expect("the next request arrives")
+                .unwrap();
+            let request = read_complete_http_request(&mut socket).await;
+            let method = String::from_utf8_lossy(&request)
+                .split_whitespace()
+                .next()
+                .map(str::to_owned);
+            methods.push(method.expect("the request names its method"));
+            socket.write_all(&response).await.unwrap();
+        }
+        methods
+    });
+    let config = TallyConfig {
+        host: address.ip().to_string(),
+        port: address.port(),
+    };
+    (config, server)
+}
+
+/// Runs the desktop capability probe against one status answer and one
+/// company-list answer, and returns what it reports.
+pub(crate) async fn probe_answering_the_company_list(xml: String) -> super::TallyProbeResult {
+    let (config, server) = answer_in_order(vec![
+        utf8_status_response("<RESPONSE>TallyPrime Server is Running</RESPONSE>"),
+        utf16_xml_response(&xml),
+    ])
+    .await;
+    let probe = TallyClient::new(config).unwrap().probe().await.unwrap();
+    // Only these two requests are answered, and both arrived in this order.
+    assert_eq!(server.await.unwrap(), ["GET", "POST"]);
+    probe
+}
+
+/// Runs the interactive company discovery against one company-list answer,
+/// and returns the companies it lists.
+pub(crate) async fn fetch_companies_answering_the_company_list(
+    xml: String,
+) -> Vec<crate::tally::TallyCompany> {
+    let (config, server) = answer_in_order(vec![utf16_xml_response(&xml)]).await;
+    let companies = TallyClient::new(config)
+        .unwrap()
+        .fetch_companies()
+        .await
+        .unwrap();
+    assert_eq!(server.await.unwrap(), ["POST"]);
+    companies
+}
+
+/// The desktop capability probe lists a company whose name no read can carry
+/// beside one whose name it can (#2433). Both are listed, each name byte for
+/// byte; the name rule, applied to what the probe returns, gives the
+/// unsendable one its reason; and the probe's profile is exactly what the
+/// valid company alone gives. Before #2445, a name over the limit made the
+/// probe report the list's shape as unrecognized, and a name with an edge tab
+/// was listed with the tab trimmed off. The selection of each company is
+/// tested in `commands_tests.rs`.
+#[tokio::test]
+async fn capability_probe_lists_an_unsendable_company_beside_a_valid_one() {
+    use bridge_tally_protocol::xml_read_profiles::{
+        CompanyNameRefusal, ValidatedCompanyName, MAX_COMPANY_NAME_BYTES,
+    };
+    let valid = SHAPE_LAB_COMPANY_NAME;
+    let alone = probe_answering_the_company_list(shape_lab_company_list()).await;
+    assert_eq!(alone.companies.len(), 1);
+    assert_eq!(
+        alone.profile.features[&CapabilityFeatureId::LoadedCompanies].state,
+        CapabilityState::Supported
+    );
+
+    let long = "A".repeat(MAX_COMPANY_NAME_BYTES + 1);
+    for (second, held, refusal) in [
+        (
+            long.as_str(),
+            long.as_str(),
+            CompanyNameRefusal::LengthNotEstablished,
+        ),
+        ("&#x9;LAB", "\tLAB", CompanyNameRefusal::ControlCharacter),
+    ] {
+        let probe = probe_answering_the_company_list(shape_lab_company_list_beside(second)).await;
+        assert_eq!(probe.companies.len(), 2, "{refusal:?}: both companies list");
+        assert_eq!(probe.companies[0].name, valid);
+        assert_eq!(probe.companies[1].name, held, "held byte for byte");
+        assert_eq!(
+            probe.companies[1].guid.as_deref(),
+            Some("3a6bd6e1-b835-4bff-89dd-8a6af138c347")
+        );
+        assert_eq!(
+            ValidatedCompanyName::refusal(&probe.companies[1].name),
+            Some(refusal)
+        );
+        assert_eq!(
+            probe.profile.features[&CapabilityFeatureId::StableCompanyIdentity]
+                .safe_reason_code
+                .as_deref(),
+            Some("stable_company_identity_observed")
+        );
+        assert_eq!(probe.profile, alone.profile, "{refusal:?}");
+    }
 }
 
 /// A mark whose master estimate fits is admitted with no count read; any more

@@ -1,0 +1,26 @@
+# fixture: tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ex-20260801.utf16le.xml
+# parser: parse_ledger_outstandings_answer(20260401..20260801)
+# source: captured
+Ok(PartyBillsAnswer {
+    bills: [
+        PartyBill {
+            reference: Bill(
+                "BP/26-27/0271",
+            ),
+            bill_date: TallyDate(
+                "20260801",
+            ),
+            closing: ExactDecimal(
+                "-1051.00",
+            ),
+            due_date: Some(
+                TallyDate(
+                    "20260801",
+                ),
+            ),
+            overdue_days: Some(
+                0,
+            ),
+        },
+    ],
+})

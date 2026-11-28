@@ -255,7 +255,12 @@ Contra vouchers, and 5 Journals).
   was sent. For a batch it also needs the post's own recorded verdict
   that its voucher step matched what Tally reported creating; the mark is
   not read again for this, since it may have moved for other reasons. A
-  refusal is final, so an edit made in Tally to one voucher
+  post that landed in part (every counter reported, at least one created and
+  one exception, nothing else, a total equal to the vouchers sent, the mark
+  moved by what Tally reported creating) is never read as not created, since
+  a count does not say which voucher: the next step of a voucher the check
+  cannot find adds only how many vouchers Tally reported as not created and
+  that which is not known. A refusal is final, so an edit made in Tally to one voucher
   before a deferred bind refuses the binding of the whole batch.
 - **Known limits:** identical twins are bound by position alone, since they
   are identical in content and their own order cannot be observed (the request

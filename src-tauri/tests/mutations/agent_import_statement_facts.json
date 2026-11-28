@@ -1,0 +1,3899 @@
+{
+  "file": "src-tauri/src/agent_import_statement_facts.rs",
+  "base_commit": "01f57de6",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again).",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2550,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_statement_facts.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|statement|transfer|pairing/)'",
+      "time": "2026-11-12T06:20:00Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 629,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/statement|transfer|pairing|skip|contra|withdraw/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5092,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5092, for the thirty-two hand-written mutants the filtered run missed and the three the tool's run missed. One of them (S097) first failed one test, in a test that reads no statement facts (a Tally runtime read refused while draining); that test passed five runs of five alone on the unmutated tree, and S097 was run again against every test and missed there, which is the verdict recorded",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5113,
+      "command": "as the whole_set run, for the thirty-five still missed there (thirty-two hand-written, three from the tool)",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 156,
+      "missed": 2,
+      "unviable": 20
+    },
+    "hand": {
+      "caught": 216,
+      "missed": 7,
+      "unviable": 0
+    },
+    "survived_at_base": {
+      "tool": 3,
+      "hand": 32
+    },
+    "equivalent": {
+      "tool": 2,
+      "hand": 7
+    },
+    "accepted_not_equivalent": {
+      "tool": 0,
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "102:5 replace statement_record -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_saved_batch_holds_exactly_these_records",
+      "killer_at": "base"
+    },
+    "125:9 replace StatementFacts::of_statement -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "128:42 replace == with != in StatementFacts::of_statement": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_skip_only_record_failing_a_check_is_refused_and_not_recorded",
+      "killer_at": "base"
+    },
+    "172:5 replace read_skip_records -> Result<Vec<SkipOnlyRecord>, String> with Ok(vec![])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "172:5 replace read_skip_records -> Result<Vec<SkipOnlyRecord>, String> with Ok(vec![Default::default()])": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "221:9 replace FactsError::variant -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "221:9 replace FactsError::variant -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "271:5 replace admitted_reference -> Result<Option<BankReference>, FactsError> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built",
+      "killer_at": "base"
+    },
+    "271:5 replace admitted_reference -> Result<Option<BankReference>, FactsError> with Ok(Some(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "281:5 replace admitted_amount -> Result<ExactDecimal, FactsError> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "286:59 replace && with || in admitted_amount": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "286:38 replace && with || in admitted_amount": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "286:33 replace <= with > in admitted_amount": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "286:41 delete ! in admitted_amount": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "286:62 delete ! in admitted_amount": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "298:5 replace validate_statement_facts -> Result<ValidFacts, FactsError> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "302:25 replace match guard window.from > window.to with true in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "302:25 replace match guard window.from > window.to with false in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "302:37 replace > with == in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "302:37 replace > with < in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "302:37 replace > with >= in validate_statement_facts": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_window_of_one_day_is_admitted",
+      "killer_at": "this_commit"
+    },
+    "314:12 delete ! in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "328:12 delete ! in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "331:12 delete ! in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "339:34 replace == with != in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "360:71 replace && with || in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "360:48 replace == with != in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "360:89 replace == with != in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "364:37 replace != with == in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "369:52 replace && with || in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "369:29 replace == with != in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_with_no_facts_entry_in_a_lineage_with_facts_is_counted_and_blocks_cover",
+      "killer_at": "base"
+    },
+    "369:55 delete ! in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "379:47 replace == with != in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_checks_against_the_batch_line",
+      "killer_at": "base"
+    },
+    "386:12 delete ! in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "389:41 replace == with != in validate_statement_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_re_appended_record_gives_its_latest_binding_and_endpoint",
+      "killer_at": "base"
+    },
+    "406:5 replace validate_skip_record -> Result<ValidFacts, FactsError> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "411:39 replace && with || in validate_skip_record": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "411:34 replace == with != in validate_skip_record": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "411:79 replace == with != in validate_skip_record": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "413:8 delete ! in validate_skip_record": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "416:49 replace || with && in validate_skip_record": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "416:8 delete ! in validate_skip_record": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "460:9 replace BuildLine::of -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "477:9 replace BuildLine::check_withdrawn -> Result<(), TransferFactsError> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "479:17 replace || with && in BuildLine::check_withdrawn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "478:13 delete ! in BuildLine::check_withdrawn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "479:20 delete ! in BuildLine::check_withdrawn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "479:72 replace == with != in BuildLine::check_withdrawn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "496:9 replace BuildVoucher::of_vouchers -> Vec<Self> with vec![]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "496:9 replace BuildVoucher::of_vouchers -> Vec<Self> with vec![Default::default()]": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "502:19 replace || with && in BuildVoucher::of_vouchers": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "569:9 replace TransferFactsError::variant -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "569:9 replace TransferFactsError::variant -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "593:9 replace TransferFactsError::record_id -> Option<&str> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_needs_the_view_is_refused_when_it_cannot_be_read",
+      "killer_at": "base"
+    },
+    "593:9 replace TransferFactsError::record_id -> Option<&str> with Some(\"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_needs_the_view_is_refused_when_it_cannot_be_read",
+      "killer_at": "base"
+    },
+    "593:9 replace TransferFactsError::record_id -> Option<&str> with Some(\"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_needs_the_view_is_refused_when_it_cannot_be_read",
+      "killer_at": "base"
+    },
+    "610:9 replace TransferFactsError::check -> Option<&'static str> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "610:9 replace TransferFactsError::check -> Option<&'static str> with Some(\"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "610:9 replace TransferFactsError::check -> Option<&'static str> with Some(\"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "611:13 delete match arm Self::Facts{error, ..} in TransferFactsError::check": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "709:9 replace Batch::is_verified -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "709:9 replace Batch::is_verified -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "709:40 replace && with || in Batch::is_verified": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "709:21 replace == with != in Batch::is_verified": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "709:43 delete ! in Batch::is_verified": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "713:9 replace Batch::endpoint -> Result<&str, TransferFactsError> with Ok(\"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "713:9 replace Batch::endpoint -> Result<&str, TransferFactsError> with Ok(\"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "726:5 replace built_instant -> Result<DateTime<FixedOffset>, TransferFactsError> with Ok(DateTime::new())": {
+      "verdict": "unviable",
+      "reason": "does not compile: chrono DateTime has no such constructor"
+    },
+    "726:5 replace built_instant -> Result<DateTime<FixedOffset>, TransferFactsError> with Ok(DateTime::from_iter([Default::default()]))": {
+      "verdict": "unviable",
+      "reason": "does not compile: chrono DateTime has no such constructor"
+    },
+    "726:5 replace built_instant -> Result<DateTime<FixedOffset>, TransferFactsError> with Ok(DateTime::new(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: chrono DateTime has no such constructor"
+    },
+    "726:5 replace built_instant -> Result<DateTime<FixedOffset>, TransferFactsError> with Ok(DateTime::from(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type cannot be inferred"
+    },
+    "740:5 replace withdrawal_counts -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_made_after_the_withdrawal_is_not_retired_by_it",
+      "killer_at": "base"
+    },
+    "740:5 replace withdrawal_counts -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "740:14 replace > with == in withdrawal_counts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "740:14 replace > with < in withdrawal_counts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "740:14 replace > with >= in withdrawal_counts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawal_built_at_the_instant_of_the_skip_does_not_retire_it",
+      "killer_at": "base"
+    },
+    "748:5 replace admit_facts -> Result<Option<(ValidFacts, DateTime<FixedOffset>)>, TransferFactsError> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "748:5 replace admit_facts -> Result<Option<(ValidFacts, DateTime<FixedOffset>)>, TransferFactsError> with Ok(Some((Default::default(), DateTime::new())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "748:5 replace admit_facts -> Result<Option<(ValidFacts, DateTime<FixedOffset>)>, TransferFactsError> with Ok(Some((Default::default(), DateTime::from_iter([Default::default()]))))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "748:5 replace admit_facts -> Result<Option<(ValidFacts, DateTime<FixedOffset>)>, TransferFactsError> with Ok(Some((Default::default(), DateTime::new(Default::default()))))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "748:5 replace admit_facts -> Result<Option<(ValidFacts, DateTime<FixedOffset>)>, TransferFactsError> with Ok(Some((Default::default(), DateTime::from(Default::default()))))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "778:5 replace fold_batches -> Result<Vec<Batch>, TransferFactsError> with Ok(vec![])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "778:5 replace fold_batches -> Result<Vec<Batch>, TransferFactsError> with Ok(vec![Default::default()])": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "782:42 replace match guard line.company_guid.eq_ignore_ascii_case(company_guid) with true in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_of_another_company_holds_nothing",
+      "killer_at": "base"
+    },
+    "782:42 replace match guard line.company_guid.eq_ignore_ascii_case(company_guid) with false in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "788:29 replace || with && in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_later_full_record_that_differs_from_the_first_is_an_error",
+      "killer_at": "base"
+    },
+    "787:29 replace || with && in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_later_full_record_that_differs_from_the_first_is_an_error",
+      "killer_at": "base"
+    },
+    "786:48 replace != with == in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "787:53 replace != with == in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "788:53 replace != with == in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "795:37 replace |= with &= in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "795:52 replace == with != in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "796:42 replace |= with &= in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "796:57 replace == with != in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "808:48 replace == with != in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "809:53 replace == with != in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "826:33 replace |= with &= in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "826:43 replace == with != in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "827:38 replace |= with &= in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "827:48 replace == with != in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "828:32 replace |= with &= in fold_batches": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "865:9 replace SkipMention::merge_into with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "868:37 replace || with && in SkipMention::merge_into": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::liveness_follows_the_row_not_the_mention_the_merge_kept",
+      "killer_at": "base"
+    },
+    "869:51 replace > with == in SkipMention::merge_into": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_recorded_again_after_the_withdrawal_keeps_the_row_open",
+      "killer_at": "base"
+    },
+    "869:51 replace > with < in SkipMention::merge_into": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_recorded_again_after_the_withdrawal_keeps_the_row_open",
+      "killer_at": "base"
+    },
+    "869:51 replace > with >= in SkipMention::merge_into": {
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "917:5 replace contra_legs -> Result<Option<([ContraLeg; 2], ExactDecimal)>, TransferFactsError> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "917:5 replace contra_legs -> Result<Option<([ContraLeg; 2], ExactDecimal)>, TransferFactsError> with Ok(Some(([Default::default(); 2], Default::default())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "920:44 replace || with && in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "920:21 replace != with == in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "920:58 replace == with != in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "927:34 replace match guard left == right with true in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted",
+      "killer_at": "base"
+    },
+    "927:34 replace match guard left == right with false in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "927:39 replace == with != in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "930:65 replace && with || in contra_legs": {
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "930:47 delete ! in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "930:68 delete ! in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "939:38 replace == with != in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "954:43 replace && with || in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_left_out_of_its_statement_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "954:25 replace != with == in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "954:80 replace == with != in contra_legs": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_left_out_of_its_statement_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "965:5 replace lineage_facts -> Result<LineageFacts, TransferFactsError> with Ok(Default::default())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1011:43 replace || with && in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    },
+    "1011:28 replace || with && in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "1035:32 delete ! in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "1040:9 delete field skips from struct LineageFacts expression in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1041:9 delete field all_verified from struct LineageFacts expression in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "1042:9 delete field ledgers from struct LineageFacts expression in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "1050:29 replace == with != in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_the_facts_cannot_see_in_a_lineage_that_holds_facts_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "1051:37 replace += with -= in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_the_facts_cannot_see_in_a_lineage_that_holds_facts_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "1051:37 replace += with *= in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_with_no_facts_entry_in_a_lineage_with_facts_is_counted_and_blocks_cover",
+      "killer_at": "base"
+    },
+    "1054:36 replace == with != in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_amended_off_a_bank_still_blocks_the_banks_it_named",
+      "killer_at": "base"
+    },
+    "1067:28 replace += with -= in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "1067:28 replace += with *= in lineage_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "1123:5 replace statement_banks -> BTreeSet<LedgerGuid> with BTreeSet::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1123:5 replace statement_banks -> BTreeSet<LedgerGuid> with BTreeSet::from_iter([Default::default()])": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "1142:5 replace block_unseen with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1153:5 replace block_voucher with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1162:42 replace == with != in block_voucher": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "1169:21 replace == with != in block_voucher": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_naming_one_statement_bank_blocks_nothing",
+      "killer_at": "base"
+    },
+    "1175:28 replace && with || in block_voucher": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1175:24 replace < with == in block_voucher": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1175:24 replace < with > in block_voucher": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_naming_one_statement_bank_blocks_nothing",
+      "killer_at": "base"
+    },
+    "1175:24 replace < with <= in block_voucher": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "1206:5 replace build_transfer_facts -> Result<TransferFacts, TransferFactsError> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "1258:29 replace += with -= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "1258:29 replace += with *= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "1259:31 replace += with -= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_the_facts_cannot_see_in_a_lineage_that_holds_facts_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "1259:31 replace += with *= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_with_no_facts_entry_in_a_lineage_with_facts_is_counted_and_blocks_cover",
+      "killer_at": "base"
+    },
+    "1266:54 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_with_a_row_outside_its_window_still_adds_no_cover",
+      "killer_at": "base"
+    },
+    "1266:31 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_with_a_row_outside_its_window_still_adds_no_cover",
+      "killer_at": "base"
+    },
+    "1266:49 replace == with != in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "1266:77 replace == with != in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "1296:12 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "1346:12 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1346:25 replace || with && in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1371:48 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1377:51 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_row_names_the_restored_batch_that_holds_it",
+      "killer_at": "base"
+    },
+    "1385:25 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "1385:28 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1388:63 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1389:67 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "1389:70 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view",
+      "killer_at": "base"
+    },
+    "1390:61 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_row_names_the_restored_batch_that_holds_it",
+      "killer_at": "base"
+    },
+    "1392:39 replace += with -= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1392:39 replace += with *= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "1418:32 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    },
+    "1442:13 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_is_superseded_only_by_a_batch_holding_a_statement_id",
+      "killer_at": "base"
+    },
+    "1441:13 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_is_superseded_only_by_a_batch_holding_a_statement_id",
+      "killer_at": "base"
+    },
+    "1440:13 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "1439:26 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "1440:16 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rebuild_once_found_posted_is_not_superseded_whatever_its_status_now",
+      "killer_at": "base"
+    },
+    "1448:25 replace && with || in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "1447:46 replace != with == in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "1448:46 replace || with && in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "1451:32 replace += with -= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "1451:32 replace += with *= in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "1474:12 delete ! in build_transfer_facts": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "S001": {
+      "what": "POSTED_VERIFIED: another status text",
+      "edits": [
+        {
+          "from": "const POSTED_VERIFIED: &str = \"posted_verified\";",
+          "to": "const POSTED_VERIFIED: &str = \"posted\";"
+        }
+      ],
+      "mutation": "d396b9cdb0eb4d5e7d34bdafb8b38135",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S002": {
+      "what": "SKIPS_FILE: another file name",
+      "edits": [
+        {
+          "from": "\"agent-import-statement-skips.jsonl\"",
+          "to": "\"agent-import-statement-skip.jsonl\""
+        }
+      ],
+      "mutation": "ec361045d9027b88df606df84ad29f87",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_skip_only_record_holds_the_canonical_company_guid",
+      "killer_at": "base"
+    },
+    "S003": {
+      "what": "RowDirection: written in another case",
+      "edits": [
+        {
+          "from": "#[serde(rename_all = \"snake_case\")]\npub(super) enum RowDirection",
+          "to": "#[serde(rename_all = \"UPPERCASE\")]\npub(super) enum RowDirection"
+        }
+      ],
+      "mutation": "b750c26cd3c6f1be13f040c24df9ae62",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S004": {
+      "what": "ContraRow: an unknown field accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct ContraRow",
+          "to": "pub(super) struct ContraRow"
+        }
+      ],
+      "mutation": "ad83bf00d44287141f489481507e6410",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::an_unknown_field_is_refused_at_every_level_of_the_facts",
+      "killer_at": "this_commit"
+    },
+    "S005": {
+      "what": "SkipRow: an unknown field accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct SkipRow",
+          "to": "pub(super) struct SkipRow"
+        }
+      ],
+      "mutation": "8d71a4595a87b5c75e50fdbc2317e016",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::an_unknown_field_is_refused_at_every_level_of_the_facts",
+      "killer_at": "this_commit"
+    },
+    "S006": {
+      "what": "StatementFacts: an unknown field accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct StatementFacts",
+          "to": "pub(super) struct StatementFacts"
+        }
+      ],
+      "mutation": "1665913d785c40e69842ea33cba6bfd9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_statement_this_release_cannot_parse_does_not_make_the_journal_unreadable",
+      "killer_at": "base"
+    },
+    "S007": {
+      "what": "SkipOnlyRecord: an unknown field accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct SkipOnlyRecord",
+          "to": "pub(super) struct SkipOnlyRecord"
+        }
+      ],
+      "mutation": "bed01a14ec262cfb5dcd54f9f8140324",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_skip_file_refuses_what_the_journal_framing_refuses",
+      "killer_at": "base"
+    },
+    "S008": {
+      "what": "StatementWindow: an unknown field accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct StatementWindow",
+          "to": "pub(super) struct StatementWindow"
+        }
+      ],
+      "mutation": "f47a15fefda1a546a4b68b86a24d40b6",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::an_unknown_field_is_refused_at_every_level_of_the_facts",
+      "killer_at": "this_commit"
+    },
+    "S009": {
+      "what": "ContraRow: reversed_same_day required",
+      "edits": [
+        {
+          "from": "    /// The statement holds another row on the same date, of an equal amount,\n    /// the other way.\n    #[serde(default, skip_serializing_if = \"std::ops::Not::not\")]",
+          "to": "    /// The statement holds another row on the same date, of an equal amount,\n    /// the other way.\n    #[serde(skip_serializing_if = \"std::ops::Not::not\")]"
+        }
+      ],
+      "mutation": "6f627cb37b215002463936c80b2f88ef",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "S010": {
+      "what": "SkipRow: reversed_same_day always written",
+      "edits": [
+        {
+          "from": "    /// As on [`ContraRow`].\n    #[serde(default, skip_serializing_if = \"std::ops::Not::not\")]",
+          "to": "    /// As on [`ContraRow`].\n    #[serde(default)]"
+        }
+      ],
+      "mutation": "4c3bd3eda1d89fc279b3ad554360a9dc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S011": {
+      "what": "StatementFacts: an empty skip list written",
+      "edits": [
+        {
+          "from": "    #[serde(default, skip_serializing_if = \"Vec::is_empty\")]\n    pub(super) skip_rows",
+          "to": "    #[serde(default)]\n    pub(super) skip_rows"
+        }
+      ],
+      "mutation": "f163febd1dc7e7fe4ae3170c7cdf200a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::the_facts_written_leave_out_what_is_empty",
+      "killer_at": "this_commit"
+    },
+    "S012": {
+      "what": "StatementFacts: coverage required",
+      "edits": [
+        {
+          "from": "    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub(super) coverage",
+          "to": "    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub(super) coverage"
+        }
+      ],
+      "mutation": "5c613655433edc2c125b977585625019",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S013": {
+      "what": "of_statement: a ledger matched by another binding's name",
+      "edits": [
+        {
+          "from": ".find(|bound| bound.name == name)",
+          "to": ".find(|bound| bound.name.eq_ignore_ascii_case(name))"
+        }
+      ],
+      "mutation": "16d9a442350383fb27de6be8d9b6c4be",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S014": {
+      "what": "of_statement: an unbound name given the first GUID",
+      "edits": [
+        {
+          "from": "                .map(|bound| bound.guid.clone())\n                .unwrap_or_default()",
+          "to": "                .or(binding.first())\n                .map(|bound| bound.guid.clone())\n                .unwrap_or_default()"
+        }
+      ],
+      "mutation": "931d5f8d487aa50a0069fba2a59d6ed1",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S015": {
+      "what": "of_statement: the coverage dates swapped",
+      "edits": [
+        {
+          "from": ".map(|(from, to)| StatementWindow { from, to }),",
+          "to": ".map(|(from, to)| StatementWindow { from: to, to: from }),"
+        }
+      ],
+      "mutation": "368fb4c4014ea5a4fb74a92e0a82f0fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_statement_of_only_skipped_rows_is_recorded_and_builds_nothing",
+      "killer_at": "base"
+    },
+    "S016": {
+      "what": "of_statement: a Contra's reference dropped",
+      "edits": [
+        {
+          "from": "                    reference: contra.reference.as_ref().map(ToString::to_string),",
+          "to": "                    reference: None,"
+        }
+      ],
+      "mutation": "d476f3ba6a9d55558e9fe1fef43cfdda",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S017": {
+      "what": "of_statement: a Contra's instrument dropped",
+      "edits": [
+        {
+          "from": "                    instrument: contra.instrument.clone(),",
+          "to": "                    instrument: None,"
+        }
+      ],
+      "mutation": "fef00d406b0fc19fb210467b4db858ef",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S018": {
+      "what": "of_statement: a Contra's same-day reversal dropped",
+      "edits": [
+        {
+          "from": "                    reversed_same_day: contra.reversed_same_day,",
+          "to": "                    reversed_same_day: false,"
+        }
+      ],
+      "mutation": "93af8996bfc6fb7e91a6f1240e6ff83d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S019": {
+      "what": "of_statement: a skip's direction inverted",
+      "edits": [
+        {
+          "from": "                        FileDirection::Outflow => RowDirection::Outflow,\n                        FileDirection::Inflow => RowDirection::Inflow,",
+          "to": "                        FileDirection::Outflow => RowDirection::Inflow,\n                        FileDirection::Inflow => RowDirection::Outflow,"
+        }
+      ],
+      "mutation": "3b1619ed783cea0cc38f32b5a09ce800",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S020": {
+      "what": "of_statement: a skip's other ledger bound as the bank",
+      "edits": [
+        {
+          "from": "other_ledger_guid: guid(&skip.other_ledger),",
+          "to": "other_ledger_guid: guid(&statement.bank_ledger),"
+        }
+      ],
+      "mutation": "14b984828731f49206a62985b2a1da34",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_skip_only_record_holds_the_canonical_company_guid",
+      "killer_at": "base"
+    },
+    "S021": {
+      "what": "of_statement: a skip's reference dropped",
+      "edits": [
+        {
+          "from": "                    reference: skip.reference.as_ref().map(ToString::to_string),",
+          "to": "                    reference: None,"
+        }
+      ],
+      "mutation": "957246ba57b12071e7cd27e2139ccf4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S022": {
+      "what": "of_statement: a skip's instrument dropped",
+      "edits": [
+        {
+          "from": "                    instrument: skip.instrument.clone(),",
+          "to": "                    instrument: None,"
+        }
+      ],
+      "mutation": "7b9f8404a1ec2b4f1f7a507a33c4e687",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_skipped_rows_instrument_is_written_into_the_facts",
+      "killer_at": "this_commit"
+    },
+    "S023": {
+      "what": "of_statement: a skip's same-day reversal dropped",
+      "edits": [
+        {
+          "from": "                    reversed_same_day: skip.reversed_same_day,\n                })",
+          "to": "                    reversed_same_day: false,\n                })"
+        }
+      ],
+      "mutation": "f98beb93f884e3b5fd28547051d432f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_version_two_statement_build_writes_facts_the_transfer_view_reads",
+      "killer_at": "base"
+    },
+    "S024": {
+      "what": "read_skip_records: invalid UTF-8 given the invalid code",
+      "edits": [
+        {
+          "from": ".map_err(|_| \"import_ledger_unavailable\".to_string())?;",
+          "to": ".map_err(|_| \"import_ledger_invalid\".to_string())?;"
+        }
+      ],
+      "mutation": "8f9c9d862a81f2519d7c633b7d5f40f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_skip_file_refuses_what_the_journal_framing_refuses",
+      "killer_at": "base"
+    },
+    "S025": {
+      "what": "read_skip_records: a record that does not parse given the unavailable code",
+      "edits": [
+        {
+          "from": "records.push(serde_json::from_str(text).map_err(|_| \"import_ledger_invalid\".to_string())?);",
+          "to": "records.push(serde_json::from_str(text).map_err(|_| \"import_ledger_unavailable\".to_string())?);"
+        }
+      ],
+      "mutation": "a0c75abb4c0d14febeae560b981ed224",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unreadable_journal_or_skip_file_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S026": {
+      "what": "read_skip_records: a record that does not parse skipped",
+      "edits": [
+        {
+          "from": "records.push(serde_json::from_str(text).map_err(|_| \"import_ledger_invalid\".to_string())?);",
+          "to": "if let Ok(record) = serde_json::from_str(text) { records.push(record); }"
+        }
+      ],
+      "mutation": "c91921ceda128c1041a2dfbca26ee9bc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_view_stops_the_send_of_a_statement_row",
+      "killer_at": "base"
+    },
+    "S027": {
+      "what": "FactsError::variant: empty_ledger_guid spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"empty_ledger_guid\",",
+          "to": "=> \"empty_ledger_guid_x\","
+        }
+      ],
+      "mutation": "d2bdbaf8d25a0e7d75e621d082aa0cea",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S028": {
+      "what": "FactsError::variant: inverted_coverage spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"inverted_coverage\",",
+          "to": "=> \"inverted_coverage_x\","
+        }
+      ],
+      "mutation": "82bc19cc71a687e684dab1f072cb7ea7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S029": {
+      "what": "FactsError::variant: duplicate_txn_id spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"duplicate_txn_id\",",
+          "to": "=> \"duplicate_txn_id_x\","
+        }
+      ],
+      "mutation": "23288880c6ad390f8114a02a1bf36f38",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S030": {
+      "what": "FactsError::variant: skip_id_not_statement_id spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"skip_id_not_statement_id\",",
+          "to": "=> \"skip_id_not_statement_id_x\","
+        }
+      ],
+      "mutation": "fa96c96ccb339e8d2d5f6d218548b6ec",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S031": {
+      "what": "FactsError::variant: reference_inadmissible spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"reference_inadmissible\",",
+          "to": "=> \"reference_inadmissible_x\","
+        }
+      ],
+      "mutation": "d8dd5f52bef1fe399e3bed8ba1ee0dc4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S032": {
+      "what": "FactsError::variant: amount_inadmissible spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"amount_inadmissible\",",
+          "to": "=> \"amount_inadmissible_x\","
+        }
+      ],
+      "mutation": "0f438f649d64c16608dce0b1a6146577",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S033": {
+      "what": "FactsError::variant: skip_ledgers_equal spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"skip_ledgers_equal\",",
+          "to": "=> \"skip_ledgers_equal_x\","
+        }
+      ],
+      "mutation": "0cc0c8771adbc848980168e876589633",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S034": {
+      "what": "FactsError::variant: contra_row_not_one_contra_voucher spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"contra_row_not_one_contra_voucher\",",
+          "to": "=> \"contra_row_not_one_contra_voucher_x\","
+        }
+      ],
+      "mutation": "b218c5c446a48b9e164b57188ae473b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S035": {
+      "what": "FactsError::variant: contra_voucher_not_in_facts spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"contra_voucher_not_in_facts\",",
+          "to": "=> \"contra_voucher_not_in_facts_x\","
+        }
+      ],
+      "mutation": "dbe81de8fbffbb03d15dfb2871fa9487",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S036": {
+      "what": "FactsError::variant: skip_is_voucher spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"skip_is_voucher\",",
+          "to": "=> \"skip_is_voucher_x\","
+        }
+      ],
+      "mutation": "69dcf1e3bfdaf6d4e76dd3fa32d17da1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S037": {
+      "what": "FactsError::variant: bank_ledger_unbound spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"bank_ledger_unbound\",",
+          "to": "=> \"bank_ledger_unbound_x\","
+        }
+      ],
+      "mutation": "569281b0b71295ba9931c30b2b21612c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S038": {
+      "what": "FactsError::variant: bad_record_id spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"bad_record_id\",",
+          "to": "=> \"bad_record_id_x\","
+        }
+      ],
+      "mutation": "ef87afbd186e8913c6a20400da4d526c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S039": {
+      "what": "FactsError::variant: not_skip_only spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"not_skip_only\",",
+          "to": "=> \"not_skip_only_x\","
+        }
+      ],
+      "mutation": "e63f86787be1451d08458af38035b863",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S040": {
+      "what": "FactsError::variant: withdrawn_row_not_voucher spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"withdrawn_row_not_voucher\",",
+          "to": "=> \"withdrawn_row_not_voucher_x\","
+        }
+      ],
+      "mutation": "790d3c30922e85c90b0781ea035cea1f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "S041": {
+      "what": "FactsError::variant: unparsable spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"unparsable\",",
+          "to": "=> \"unparsable_x\","
+        }
+      ],
+      "mutation": "128fb4d9efb14daebabe2b591ce0734e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_failed_check_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S042": {
+      "what": "admitted_amount: three places admitted",
+      "edits": [
+        {
+          "from": "places <= 2 && !amount.is_zero()",
+          "to": "places <= 3 && !amount.is_zero()"
+        }
+      ],
+      "mutation": "4c7ae078b9a63cd31940ff1ef2aa51db",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S043": {
+      "what": "admitted_amount: places counted after the last point",
+      "edits": [
+        {
+          "from": ".split_once('.')\n        .map_or(0, |(_, fraction)| fraction.len());",
+          "to": ".rsplit_once('.')\n        .map_or(0, |(_, fraction)| fraction.len());"
+        }
+      ],
+      "mutation": "cd6e89d2fbc574da3a864fc4d8c964e1",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S044": {
+      "what": "admitted_amount: the places counted on the trimmed fraction",
+      "edits": [
+        {
+          "from": ".map_or(0, |(_, fraction)| fraction.len());",
+          "to": ".map_or(0, |(_, fraction)| fraction.trim_end_matches('0').len());"
+        }
+      ],
+      "mutation": "0dc2591912a9db686ebb4cfbcfb067e4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::an_amount_is_refused_for_a_third_place_whatever_its_digit",
+      "killer_at": "this_commit"
+    },
+    "S045": {
+      "what": "validate: an inverted window read the other way",
+      "edits": [
+        {
+          "from": "Some(window) if window.from > window.to => return Err(FactsError::InvertedCoverage),",
+          "to": "Some(window) if window.from > window.to => Some(ParseWindow { from: window.to.clone(), to: window.from.clone() }),"
+        }
+      ],
+      "mutation": "a059c08829153a197549eaf123b26daf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S046": {
+      "what": "validate: the window kept with its ends swapped",
+      "edits": [
+        {
+          "from": "        Some(window) => Some(ParseWindow {\n            from: window.from.clone(),\n            to: window.to.clone(),\n        }),",
+          "to": "        Some(window) => Some(ParseWindow {\n            from: window.from.clone(),\n            to: window.from.clone(),\n        }),"
+        }
+      ],
+      "mutation": "e75233e4f1ab0699af93486dbc9d259e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "S047": {
+      "what": "validate: the window dropped",
+      "edits": [
+        {
+          "from": "        Some(window) => Some(ParseWindow {\n            from: window.from.clone(),\n            to: window.to.clone(),\n        }),",
+          "to": "        Some(_) => None,"
+        }
+      ],
+      "mutation": "a90718dd314ddd90e6d2975bacbf6ec2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "S048": {
+      "what": "validate: a Contra id named twice admitted",
+      "edits": [
+        {
+          "from": "    for row in &facts.contra_rows {\n        let txn = row.bridge_txn_id.as_str();\n        if !seen.insert(txn) {\n            return Err(FactsError::DuplicateTxnId { txn: txn.into() });\n        }",
+          "to": "    for row in &facts.contra_rows {\n        let txn = row.bridge_txn_id.as_str();\n        seen.insert(txn);"
+        }
+      ],
+      "mutation": "02eb4aa16fdcc02d815932dbef468d15",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S049": {
+      "what": "validate: a Contra's reference not checked",
+      "edits": [
+        {
+          "from": "            admitted_reference(txn, row.reference.as_deref())?,\n        );",
+          "to": "            admitted_reference(txn, row.reference.as_deref()).unwrap_or(None),\n        );"
+        }
+      ],
+      "mutation": "eb65144a1f8e2ce3aa78f8b009226a15",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S050": {
+      "what": "validate: a Contra's same-day reversal dropped",
+      "edits": [
+        {
+          "from": "        if row.reversed_same_day {\n            reversed_contras.insert(txn.to_string());\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "559c3e9c39fbcaf10d0d3367d6171404",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S051": {
+      "what": "validate: a skip id named twice admitted",
+      "edits": [
+        {
+          "from": "    for row in &facts.skip_rows {\n        let txn = row.bridge_txn_id.as_str();\n        if !seen.insert(txn) {\n            return Err(FactsError::DuplicateTxnId { txn: txn.into() });\n        }",
+          "to": "    for row in &facts.skip_rows {\n        let txn = row.bridge_txn_id.as_str();\n        seen.insert(txn);"
+        }
+      ],
+      "mutation": "9115eac5190cfedd4360388deabf2d87",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S052": {
+      "what": "validate: a skip id not checked as a statement id",
+      "edits": [
+        {
+          "from": "        if !is_statement_txn_id(txn) {\n            return Err(FactsError::SkipIdNotStatementId { txn: txn.into() });\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "92e2a2d95d92426331f60829cf3d52bd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_facts_error_names_its_batch_and_fails_the_whole_view",
+      "killer_at": "base"
+    },
+    "S053": {
+      "what": "validate: a skip's reference not checked",
+      "edits": [
+        {
+          "from": "        let reference = admitted_reference(txn, row.reference.as_deref())?;",
+          "to": "        let reference = admitted_reference(txn, row.reference.as_deref()).unwrap_or(None);"
+        }
+      ],
+      "mutation": "8adc6d079f8751984e9187239c78e30c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S054": {
+      "what": "validate: a skip's empty other ledger given the equal-ledgers error",
+      "edits": [
+        {
+          "from": "        if row.other_ledger_guid.is_empty() {\n            return Err(FactsError::EmptyLedgerGuid);\n        }",
+          "to": "        if row.other_ledger_guid.is_empty() {\n            return Err(FactsError::SkipLedgersEqual { txn: txn.into() });\n        }"
+        }
+      ],
+      "mutation": "4f55bce9de2ed9f4b2f0284b0937f4ba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_semantic_check_is_a_typed_error",
+      "killer_at": "base"
+    },
+    "S055": {
+      "what": "validate: a skip's other ledger compared ignoring case",
+      "edits": [
+        {
+          "from": "if row.other_ledger_guid == facts.bank_ledger_guid {",
+          "to": "if row.other_ledger_guid.eq_ignore_ascii_case(&facts.bank_ledger_guid) {"
+        }
+      ],
+      "mutation": "f808f6ec7cd51bd1e550488ce46bd76f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::ledger_guids_are_compared_as_written",
+      "killer_at": "this_commit"
+    },
+    "S056": {
+      "what": "validate: a skip's direction inverted",
+      "edits": [
+        {
+          "from": "                RowDirection::Outflow => Direction::Outflow,\n                RowDirection::Inflow => Direction::Inflow,",
+          "to": "                RowDirection::Outflow => Direction::Inflow,\n                RowDirection::Inflow => Direction::Outflow,"
+        }
+      ],
+      "mutation": "7be899fc06c7d92904323970a2c5292f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_carries_its_row_into_the_view",
+      "killer_at": "base"
+    },
+    "S057": {
+      "what": "validate: a skip's other ledger given the bank's GUID",
+      "edits": [
+        {
+          "from": "other_ledger: LedgerGuid::new(row.other_ledger_guid.as_str()),",
+          "to": "other_ledger: LedgerGuid::new(facts.bank_ledger_guid.as_str()),"
+        }
+      ],
+      "mutation": "525a9bc47290e7c4b075afe3ca91ca39",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "S058": {
+      "what": "validate: a skip's reference dropped",
+      "edits": [
+        {
+          "from": "            reference,\n            reversed_same_day: row.reversed_same_day,",
+          "to": "            reference: None,\n            reversed_same_day: row.reversed_same_day,"
+        }
+      ],
+      "mutation": "f60339293bb4dac3f3892b1b25e06793",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built",
+      "killer_at": "base"
+    },
+    "S059": {
+      "what": "validate: a skip's same-day reversal dropped",
+      "edits": [
+        {
+          "from": "            reference,\n            reversed_same_day: row.reversed_same_day,",
+          "to": "            reference,\n            reversed_same_day: false,"
+        }
+      ],
+      "mutation": "df59139e896c6cfcd2bf62e9dda5d457",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S060": {
+      "what": "validate: a Contra voucher of another type counted",
+      "edits": [
+        {
+          "from": ".filter(|voucher| voucher.kind == VoucherType::Contra && voucher.txn_id == txn)",
+          "to": ".filter(|voucher| voucher.txn_id == txn)"
+        }
+      ],
+      "mutation": "1b211ebf0399bada06081420584adfc1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_checks_against_the_batch_line",
+      "killer_at": "base"
+    },
+    "S061": {
+      "what": "validate: two Contra vouchers for one row admitted",
+      "edits": [
+        {
+          "from": "if contra_vouchers(txn) != 1 {",
+          "to": "if contra_vouchers(txn) == 0 {"
+        }
+      ],
+      "mutation": "a15d5baf1e8cce5247a3174d266e8ab7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_checks_against_the_batch_line",
+      "killer_at": "base"
+    },
+    "S062": {
+      "what": "validate: a Contra voucher missing from the facts admitted",
+      "edits": [
+        {
+          "from": "            if voucher.kind == VoucherType::Contra && !contras.contains_key(&voucher.txn_id) {\n                return Err(FactsError::ContraVoucherNotInFacts {\n                    txn: voucher.txn_id.clone(),\n                });\n            }",
+          "to": "            let _ = voucher;"
+        }
+      ],
+      "mutation": "e13cada7143d3645bae1ce80ece68edc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_checks_against_the_batch_line",
+      "killer_at": "base"
+    },
+    "S063": {
+      "what": "validate: a skip that is a voucher admitted",
+      "edits": [
+        {
+          "from": "            if shape\n                .vouchers\n                .iter()\n                .any(|voucher| voucher.txn_id == skip.txn)\n            {",
+          "to": "            if false && shape\n                .vouchers\n                .iter()\n                .any(|voucher| voucher.txn_id == skip.txn)\n            {"
+        }
+      ],
+      "mutation": "184bad9893b0ed67351b3ce928e4948e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_checks_against_the_batch_line",
+      "killer_at": "base"
+    },
+    "S064": {
+      "what": "validate: an absent binding admitted",
+      "edits": [
+        {
+          "from": "if !shape.ledger_identities.is_some_and(|identities| {",
+          "to": "if !shape.ledger_identities.is_none_or(|identities| {"
+        }
+      ],
+      "mutation": "deb3be54ae66fb84995a468874b3d0cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_build_without_a_binding_cannot_hold_facts",
+      "killer_at": "base"
+    },
+    "S065": {
+      "what": "validate: the bank ledger matched ignoring case",
+      "edits": [
+        {
+          "from": "                .any(|bound| bound.guid == facts.bank_ledger_guid)",
+          "to": "                .any(|bound| bound.guid.eq_ignore_ascii_case(&facts.bank_ledger_guid))"
+        }
+      ],
+      "mutation": "68911b423a8052940cc5d628f329bc8d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::ledger_guids_are_compared_as_written",
+      "killer_at": "this_commit"
+    },
+    "S066": {
+      "what": "validate: the valid facts given a skip's ledger as the bank",
+      "edits": [
+        {
+          "from": "        bank_ledger: LedgerGuid::new(facts.bank_ledger_guid.as_str()),\n        window,",
+          "to": "        bank_ledger: LedgerGuid::new(facts.skip_rows.first().map_or(facts.bank_ledger_guid.as_str(), |row| row.other_ledger_guid.as_str())),\n        window,"
+        }
+      ],
+      "mutation": "c5502e399f9c29e173bfe5a9b84ebe5b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "S067": {
+      "what": "validate: the Contras' reversals dropped from the valid facts",
+      "edits": [
+        {
+          "from": "        contras,\n        reversed_contras,\n        skips,\n    })",
+          "to": "        contras,\n        reversed_contras: BTreeSet::new(),\n        skips,\n    })"
+        }
+      ],
+      "mutation": "6cbcd45140d177fa8a1ade9ca954f2a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S068": {
+      "what": "validate_skip_record: another prefix",
+      "edits": [
+        {
+          "from": ".strip_prefix(\"skips-\")",
+          "to": ".strip_prefix(\"skip-\")"
+        }
+      ],
+      "mutation": "197558ae4e9d26e662578498bc0e19bc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skipped_row_is_refused_before_the_dialog_on_both_surfaces",
+      "killer_at": "base"
+    },
+    "S069": {
+      "what": "validate_skip_record: any UUID version",
+      "edits": [
+        {
+          "from": "id.get_version_num() == 4 && format!",
+          "to": "id.get_version_num() >= 1 && format!"
+        }
+      ],
+      "mutation": "5fed3e3fbbe25a94e2c2c526b8730129",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "S070": {
+      "what": "validate_skip_record: a UUID in another form admitted",
+      "edits": [
+        {
+          "from": "id.get_version_num() == 4 && format!(\"skips-{}\", id.hyphenated()) == record.record_id",
+          "to": "id.get_version_num() == 4"
+        }
+      ],
+      "mutation": "1e88d102b657e9297d2f8db2889c2674",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "S071": {
+      "what": "validate_skip_record: a record holding a Contra admitted",
+      "edits": [
+        {
+          "from": "if !record.statement.contra_rows.is_empty() || record.statement.skip_rows.is_empty() {",
+          "to": "if record.statement.skip_rows.is_empty() {"
+        }
+      ],
+      "mutation": "456c94502ee55278452bf3283aa24202",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "S072": {
+      "what": "validate_skip_record: a record holding no skip admitted",
+      "edits": [
+        {
+          "from": "if !record.statement.contra_rows.is_empty() || record.statement.skip_rows.is_empty() {",
+          "to": "if !record.statement.contra_rows.is_empty() {"
+        }
+      ],
+      "mutation": "12bc46f7afb1d857567685eb267262b9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "S073": {
+      "what": "BuildLine::of: the lineage taken as the batch id",
+      "edits": [
+        {
+          "from": "lineage: line.identity_batch_id().to_string(),",
+          "to": "lineage: line.batch_id.clone(),"
+        }
+      ],
+      "mutation": "8e920b2ed16ccb213c9aec1d5de37102",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_named_a_skip_in_its_own_lineage_is_an_error",
+      "killer_at": "base"
+    },
+    "S074": {
+      "what": "BuildLine::of: the withdrawn rows dropped",
+      "edits": [
+        {
+          "from": "withdrawn: line.withdrawn_skips.iter().flatten().cloned().collect(),",
+          "to": "withdrawn: BTreeSet::new(),"
+        }
+      ],
+      "mutation": "33d9b1f052ed2ec66d641101b513ac96",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S075": {
+      "what": "check_withdrawn: a non-statement id admitted",
+      "edits": [
+        {
+          "from": "            !is_statement_txn_id(row)\n                || !self",
+          "to": "            !self"
+        }
+      ],
+      "mutation": "59a3062ea77bed94e7807a6f27019478",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_the_batch_holds_is_refused_unless_it_is_a_statement_row",
+      "killer_at": "this_commit"
+    },
+    "S076": {
+      "what": "check_withdrawn: a row the batch does not hold admitted",
+      "edits": [
+        {
+          "from": "            !is_statement_txn_id(row)\n                || !self.vouchers.iter().any(|voucher| &voucher.txn_id == *row)",
+          "to": "            !is_statement_txn_id(row)"
+        }
+      ],
+      "mutation": "93023c2642fb0bb98eda1df7893483f6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "S077": {
+      "what": "of_vouchers: Journals left out",
+      "edits": [
+        {
+          "from": "VoucherType::Contra | VoucherType::Journal\n                ) || is_statement_txn_id",
+          "to": "VoucherType::Contra\n                ) || is_statement_txn_id"
+        }
+      ],
+      "mutation": "7409882fe8dfd536161e4c8024bfb401",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "S078": {
+      "what": "of_vouchers: statement rows of other types left out",
+      "edits": [
+        {
+          "from": ") || is_statement_txn_id(&voucher.bridge_txn_id)",
+          "to": ")"
+        }
+      ],
+      "mutation": "e5f72abf0e1f3b856aea1cec48a9b216",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S079": {
+      "what": "of_vouchers: an entry's side inverted",
+      "edits": [
+        {
+          "from": "                        side: entry.side.clone(),",
+          "to": "                        side: match entry.side { EntrySide::Dr => EntrySide::Cr, EntrySide::Cr => EntrySide::Dr },"
+        }
+      ],
+      "mutation": "bfd395c53157dff1015b8319ca043958",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::facts_from_a_journal_give_a_pair_by_reference_in_the_view",
+      "killer_at": "base"
+    },
+    "S080": {
+      "what": "TransferFactsError::variant: journal_unreadable spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"journal_unreadable\",",
+          "to": "=> \"journal_unreadable_x\","
+        }
+      ],
+      "mutation": "756856259d667a90a5eb14ce687573ca",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::an_unreadable_journal_stops_the_view_and_the_verification_section",
+      "killer_at": "base"
+    },
+    "S081": {
+      "what": "TransferFactsError::variant: skip_file_unreadable spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"skip_file_unreadable\",",
+          "to": "=> \"skip_file_unreadable_x\","
+        }
+      ],
+      "mutation": "b382c41d4075d2f8956f131814ae98c2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_file_that_cannot_be_read_refuses_a_build_that_needs_the_view",
+      "killer_at": "base"
+    },
+    "S082": {
+      "what": "TransferFactsError::variant: facts spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"facts\",",
+          "to": "=> \"facts_x\","
+        }
+      ],
+      "mutation": "b5f56e35037a53463054f994b5a315ff",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "S083": {
+      "what": "TransferFactsError::variant: missing_endpoint spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"missing_endpoint\",",
+          "to": "=> \"missing_endpoint_x\","
+        }
+      ],
+      "mutation": "15b836a727c4525d0857bf49b1f5b99e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S084": {
+      "what": "TransferFactsError::variant: built_at_unparsable spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"built_at_unparsable\",",
+          "to": "=> \"built_at_unparsable_x\","
+        }
+      ],
+      "mutation": "73cad2a440c0927fe314cac9c7f2d7e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S085": {
+      "what": "TransferFactsError::variant: batch_record_changed spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"batch_record_changed\",",
+          "to": "=> \"batch_record_changed_x\","
+        }
+      ],
+      "mutation": "46130e1d7ef21ea10e766fd8308d2e67",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S086": {
+      "what": "TransferFactsError::variant: duplicate_skip_record_id spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"duplicate_skip_record_id\",",
+          "to": "=> \"duplicate_skip_record_id_x\","
+        }
+      ],
+      "mutation": "14bb11b64cd769f003b470e8d73ed3a4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S087": {
+      "what": "TransferFactsError::variant: skip_is_voucher_in_lineage spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"skip_is_voucher_in_lineage\",",
+          "to": "=> \"skip_is_voucher_in_lineage_x\","
+        }
+      ],
+      "mutation": "154329c214ed26e35af29a76da37c123",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S088": {
+      "what": "TransferFactsError::variant: leg_ledger_unbound spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"leg_ledger_unbound\",",
+          "to": "=> \"leg_ledger_unbound_x\","
+        }
+      ],
+      "mutation": "6a85e6eeb4e96400e41c44215f448efa",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S089": {
+      "what": "TransferFactsError::variant: pairing_duplicate_skip spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"pairing_duplicate_skip\",",
+          "to": "=> \"pairing_duplicate_skip_x\","
+        }
+      ],
+      "mutation": "1cb18fc176ef0bb061d2fab66d0738df",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S090": {
+      "what": "TransferFactsError::variant: pairing_duplicate_contra spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"pairing_duplicate_contra\",",
+          "to": "=> \"pairing_duplicate_contra_x\","
+        }
+      ],
+      "mutation": "5c951e780114311e21c00125de3a8315",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S091": {
+      "what": "TransferFactsError::variant: pairing_non_positive_skip spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"pairing_non_positive_skip\",",
+          "to": "=> \"pairing_non_positive_skip_x\","
+        }
+      ],
+      "mutation": "76f3545944da9e260174b5e4134ee2a8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S092": {
+      "what": "TransferFactsError::variant: pairing_non_positive_contra spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"pairing_non_positive_contra\",",
+          "to": "=> \"pairing_non_positive_contra_x\","
+        }
+      ],
+      "mutation": "f91d88fa57aec19aea4e653979c22df4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S093": {
+      "what": "TransferFactsError::variant: pairing_skip_ledgers_equal spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"pairing_skip_ledgers_equal\",",
+          "to": "=> \"pairing_skip_ledgers_equal_x\","
+        }
+      ],
+      "mutation": "0a7dcc682b8a44365ccec1aca30d05a7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::every_failure_kind_is_named_by_its_pinned_value",
+      "killer_at": "base"
+    },
+    "S094": {
+      "what": "TransferFactsError::variant: pairing_inverted_window spelt otherwise",
+      "edits": [
+        {
+          "from": "=> \"pairing_inverted_window\",",
+          "to": "=> \"pairing_inverted_window_x\","
+        }
+      ],
+      "mutation": "863d4f474a86bc28ce2dc618dab3b879",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_failure_is_named_by_its_kind_and_record_and_never_by_a_value",
+      "killer_at": "base"
+    },
+    "S095": {
+      "what": "record_id: a leg ledger failure names no record",
+      "edits": [
+        {
+          "from": "Self::BatchRecordChanged { batch_id } | Self::LegLedgerUnbound { batch_id, .. } => {\n                Some(batch_id)\n            }",
+          "to": "Self::BatchRecordChanged { batch_id } => Some(batch_id),\n            Self::LegLedgerUnbound { .. } => None,"
+        }
+      ],
+      "mutation": "47197c54ae3cd4ddde2e660d9945692b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_failure_is_named_by_its_kind_and_record_and_never_by_a_value",
+      "killer_at": "base"
+    },
+    "S096": {
+      "what": "record_id: a lineage failure names no record",
+      "edits": [
+        {
+          "from": "Self::SkipIsVoucherInLineage { lineage, .. } => Some(lineage),",
+          "to": "Self::SkipIsVoucherInLineage { .. } => None,"
+        }
+      ],
+      "mutation": "d35388b00dae686479be0e805011afeb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_failure_is_named_by_its_kind_and_record_and_never_by_a_value",
+      "killer_at": "base"
+    },
+    "S097": {
+      "what": "record_id: a missing endpoint names no record",
+      "edits": [
+        {
+          "from": "            | Self::MissingEndpoint { source_id }\n",
+          "to": ""
+        },
+        {
+          "from": "            Self::DuplicateSkipRecordId { record_id } => Some(record_id),",
+          "to": "            Self::DuplicateSkipRecordId { record_id } => Some(record_id),\n            Self::MissingEndpoint { .. } => None,"
+        }
+      ],
+      "mutation": "5b1fe3b1a906e0aa57e3e13977a8bd77",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_missing_endpoint_names_its_record",
+      "killer_at": "this_commit"
+    },
+    "S098": {
+      "what": "Batch::is_verified: a covered batch verified",
+      "edits": [
+        {
+          "from": "self.status == POSTED_VERIFIED && !self.covered",
+          "to": "self.status == POSTED_VERIFIED"
+        }
+      ],
+      "mutation": "2a0081d83b7cf49c2f2ec4d9f34640ae",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_restored_batch_s_contra_is_not_verified",
+      "killer_at": "base"
+    },
+    "S099": {
+      "what": "withdrawal_counts: one built at the same instant counts",
+      "edits": [
+        {
+          "from": "    recorded > mention_built\n",
+          "to": "    recorded >= mention_built\n"
+        }
+      ],
+      "mutation": "6578a08299f8f7922b191aae6d07f884",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawal_built_at_the_instant_of_the_skip_does_not_retire_it",
+      "killer_at": "base"
+    },
+    "S100": {
+      "what": "admit_facts: facts checked without the batch's shape",
+      "edits": [
+        {
+          "from": "    let facts = validate_statement_facts(\n        &statement,\n        Some(LineShape {\n            vouchers: &line.vouchers,\n            ledger_identities: line.ledger_identities.as_deref(),\n        }),\n    )",
+          "to": "    let facts = validate_statement_facts(\n        &statement,\n        None,\n    )"
+        }
+      ],
+      "mutation": "10905ed41cb736aeaf92cb67d5fa1c99",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_build_without_a_binding_cannot_hold_facts",
+      "killer_at": "base"
+    },
+    "S101": {
+      "what": "admit_facts: an unreadable build time read as now",
+      "edits": [
+        {
+          "from": "        built_instant(&line.batch_id, &line.built_at)?,\n    )))",
+          "to": "        built_instant(&line.batch_id, &line.built_at).unwrap_or_else(|_| chrono::Utc::now().fixed_offset()),\n    )))"
+        }
+      ],
+      "mutation": "3cb93a47bad17d4b4ba375dde8b673a4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_build_time_that_is_not_a_time_is_an_error_where_it_is_compared",
+      "killer_at": "base"
+    },
+    "S102": {
+      "what": "fold_batches: the company compared with its case",
+      "edits": [
+        {
+          "from": "JournalEvent::Build(line) if line.company_guid.eq_ignore_ascii_case(company_guid) =>",
+          "to": "JournalEvent::Build(line) if line.company_guid == company_guid =>"
+        }
+      ],
+      "mutation": "894ab2660a119115782b0d9a139fbe7d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_company_guid_matches_whatever_its_case",
+      "killer_at": "base"
+    },
+    "S103": {
+      "what": "fold_batches: changed vouchers in a later record admitted",
+      "edits": [
+        {
+          "from": "                        if batch.line.vouchers != line.vouchers\n                            || batch.line.statement",
+          "to": "                        if batch.line.statement"
+        }
+      ],
+      "mutation": "16efcc786753d950939acf48097ae0ba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_later_full_record_that_differs_from_the_first_is_an_error",
+      "killer_at": "base"
+    },
+    "S104": {
+      "what": "fold_batches: a changed statement in a later record admitted",
+      "edits": [
+        {
+          "from": "                            || batch.line.statement != line.statement\n",
+          "to": ""
+        }
+      ],
+      "mutation": "4eceeaf8a9fc1cb7f85ea5e9a96318e4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_later_full_record_that_differs_from_the_first_is_an_error",
+      "killer_at": "base"
+    },
+    "S105": {
+      "what": "fold_batches: changed withdrawals in a later record admitted",
+      "edits": [
+        {
+          "from": "                            || batch.line.withdrawn != line.withdrawn\n",
+          "to": ""
+        }
+      ],
+      "mutation": "56b62c57f768663cda6cd6ecd5b14d97",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "S106": {
+      "what": "fold_batches: a later full record does not mark found",
+      "edits": [
+        {
+          "from": "                        batch.found |= line.status == POSTED_VERIFIED;\n                        batch.ever_found |= line.status == POSTED_VERIFIED;\n                        batch.status = line.status.clone();",
+          "to": "                        batch.ever_found |= line.status == POSTED_VERIFIED;\n                        batch.status = line.status.clone();"
+        }
+      ],
+      "mutation": "50043adf2e9f435562efcf44c7f9aea8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S107": {
+      "what": "fold_batches: a later full record does not mark ever found",
+      "edits": [
+        {
+          "from": "                        batch.found |= line.status == POSTED_VERIFIED;\n                        batch.ever_found |= line.status == POSTED_VERIFIED;\n                        batch.status = line.status.clone();",
+          "to": "                        batch.found |= line.status == POSTED_VERIFIED;\n                        batch.status = line.status.clone();"
+        }
+      ],
+      "mutation": "b7fb254f1fcdc7335a676a12bdc84fd1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S108": {
+      "what": "fold_batches: a later full record keeps the first facts",
+      "edits": [
+        {
+          "from": "                        batch.facts = admit_facts(&line)?;\n",
+          "to": "                        admit_facts(&line)?;\n"
+        }
+      ],
+      "mutation": "b051a5ac4c0711ca069d1211e2786617",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_s_facts_take_the_build_time_of_its_latest_full_record",
+      "killer_at": "this_commit"
+    },
+    "S109": {
+      "what": "fold_batches: the first record's withdrawals not checked",
+      "edits": [
+        {
+          "from": "                        line.check_withdrawn()?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "349219c402115d61ea115c38072a66d3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawn_row_must_be_a_statement_row_the_batch_holds",
+      "killer_at": "base"
+    },
+    "S110": {
+      "what": "fold_batches: a status record does not mark found",
+      "edits": [
+        {
+          "from": "                    batch.found |= status == POSTED_VERIFIED;\n                    batch.ever_found |= status == POSTED_VERIFIED;\n                    batch.sent |= sent;",
+          "to": "                    batch.ever_found |= status == POSTED_VERIFIED;\n                    batch.sent |= sent;"
+        }
+      ],
+      "mutation": "2d0f232b42a2bb6129ab425115953520",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "S111": {
+      "what": "fold_batches: a status record does not mark ever found",
+      "edits": [
+        {
+          "from": "                    batch.found |= status == POSTED_VERIFIED;\n                    batch.ever_found |= status == POSTED_VERIFIED;\n                    batch.sent |= sent;",
+          "to": "                    batch.found |= status == POSTED_VERIFIED;\n                    batch.sent |= sent;"
+        }
+      ],
+      "mutation": "865714c0e885e52a224408f284739b81",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "S112": {
+      "what": "fold_batches: a status record does not mark sent",
+      "edits": [
+        {
+          "from": "                    batch.sent |= sent;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "70788fcec5017904cdb3bdb5e732cf99",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "S113": {
+      "what": "fold_batches: a sent mark withdrawn by a later status",
+      "edits": [
+        {
+          "from": "                    batch.sent |= sent;\n",
+          "to": "                    batch.sent = sent;\n"
+        }
+      ],
+      "mutation": "c3353ea44a66f599afea0350aeac5a4b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view",
+      "killer_at": "base"
+    },
+    "S114": {
+      "what": "fold_batches: a status record does not set the status",
+      "edits": [
+        {
+          "from": "                    batch.status = status;\n",
+          "to": "                    let _ = status;\n"
+        }
+      ],
+      "mutation": "d15aaa636acfd64a8c850efd147366f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_partly_unverified_adds_no_coverage",
+      "killer_at": "base"
+    },
+    "S115": {
+      "what": "fold_batches: a covered batch stays found",
+      "edits": [
+        {
+          "from": "            batch.covered = true;\n            batch.found = false;",
+          "to": "            batch.covered = true;"
+        }
+      ],
+      "mutation": "2c7e72661472053c2a71dd3a9f68ac8a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_row_names_the_restored_batch_that_holds_it",
+      "killer_at": "base"
+    },
+    "S116": {
+      "what": "fold_batches: a covered batch not marked covered",
+      "edits": [
+        {
+          "from": "            batch.covered = true;\n            batch.found = false;",
+          "to": "            batch.found = false;"
+        }
+      ],
+      "mutation": "74efd1ff06c4a26054699d0ad961de60",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_row_names_the_restored_batch_that_holds_it",
+      "killer_at": "base"
+    },
+    "S117": {
+      "what": "merge_into: liveness taken from the mention kept",
+      "edits": [
+        {
+          "from": "                old.live = live;\n",
+          "to": "                let _ = live;\n"
+        }
+      ],
+      "mutation": "a28d40c6179c9c867fcfdd003e359d43",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::liveness_follows_the_row_not_the_mention_the_merge_kept",
+      "killer_at": "base"
+    },
+    "S118": {
+      "what": "merge_into: the older mention kept",
+      "edits": [
+        {
+          "from": "if (&self.built, &self.source_id) > (&old.built, &old.source_id) {",
+          "to": "if (&self.built, &self.source_id) < (&old.built, &old.source_id) {"
+        }
+      ],
+      "mutation": "d5016cf4e2ef2f8bed0a2b84017404fe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_recorded_again_after_the_withdrawal_keeps_the_row_open",
+      "killer_at": "base"
+    },
+    "S119": {
+      "what": "merge_into: a tie on time not broken by the source",
+      "edits": [
+        {
+          "from": "if (&self.built, &self.source_id) > (&old.built, &old.source_id) {",
+          "to": "if &self.built > &old.built {"
+        }
+      ],
+      "mutation": "8397145c75bc68621ca9026752a60998",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skips_built_at_one_instant_are_ordered_by_their_record_id",
+      "killer_at": "base"
+    },
+    "S120": {
+      "what": "contra_legs: a voucher of three entries read by its first two",
+      "edits": [
+        {
+          "from": "let [first, second] = voucher.entries.as_slice() else {",
+          "to": "let [first, second, ..] = voucher.entries.as_slice() else {"
+        }
+      ],
+      "mutation": "c843e074789ef776b88e17ef74176834",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_of_four_entries_is_left_out_though_two_of_them_pair",
+      "killer_at": "this_commit"
+    },
+    "S121": {
+      "what": "contra_legs: a Journal read as a Contra",
+      "edits": [
+        {
+          "from": "if voucher.kind != VoucherType::Contra || first.side == second.side {",
+          "to": "if first.side == second.side {"
+        }
+      ],
+      "mutation": "aae0984b122303de1f592cb5eee0ad42",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "S122": {
+      "what": "contra_legs: two legs on one side admitted",
+      "edits": [
+        {
+          "from": "if voucher.kind != VoucherType::Contra || first.side == second.side {",
+          "to": "if voucher.kind != VoucherType::Contra {"
+        }
+      ],
+      "mutation": "a893678476526fee9bf0c03a1367186f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted",
+      "killer_at": "base"
+    },
+    "S123": {
+      "what": "contra_legs: amounts compared as written",
+      "edits": [
+        {
+          "from": "        (Ok(left), Ok(right)) if left == right => ExactDecimal::parse(left).ok(),",
+          "to": "        (Ok(left), Ok(_)) if first.amount == second.amount => ExactDecimal::parse(left).ok(),"
+        }
+      ],
+      "mutation": "339e76f65c25e3f8e303956baa12cfc7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::equal_amounts_may_differ_in_scale",
+      "killer_at": "base"
+    },
+    "S124": {
+      "what": "contra_legs: the second leg's amount taken",
+      "edits": [
+        {
+          "from": "(Ok(left), Ok(right)) if left == right => ExactDecimal::parse(left).ok(),",
+          "to": "(Ok(left), Ok(right)) if left == right => ExactDecimal::parse(right).ok(),"
+        }
+      ],
+      "mutation": "9e1c877817a9292f015fbedcef60214b",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S125": {
+      "what": "contra_legs: a zero amount admitted",
+      "edits": [
+        {
+          "from": "let Some(amount) = amount.filter(|amount| !amount.is_zero() && !amount.is_negative()) else {",
+          "to": "let Some(amount) = amount.filter(|amount| !amount.is_negative()) else {"
+        }
+      ],
+      "mutation": "c32573964da0f4d61cf2a550b1c38169",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S126": {
+      "what": "contra_legs: a negative amount admitted",
+      "edits": [
+        {
+          "from": "let Some(amount) = amount.filter(|amount| !amount.is_zero() && !amount.is_negative()) else {",
+          "to": "let Some(amount) = amount.filter(|amount| !amount.is_zero()) else {"
+        }
+      ],
+      "mutation": "de525c4701c5dbb838ff5657d4fb19f4",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S127": {
+      "what": "contra_legs: a leg ledger matched ignoring case",
+      "edits": [
+        {
+          "from": "            .find(|bound| bound.name == entry.ledger)\n            .map(|bound| ContraLeg {",
+          "to": "            .find(|bound| bound.name.eq_ignore_ascii_case(&entry.ledger))\n            .map(|bound| ContraLeg {"
+        }
+      ],
+      "mutation": "85c235d720348fe051db9ad687737ab2",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_leg_named_in_another_case_is_a_ledger_the_build_did_not_bind",
+      "killer_at": "this_commit"
+    },
+    "S128": {
+      "what": "contra_legs: a leg's side inverted",
+      "edits": [
+        {
+          "from": "                    EntrySide::Dr => Side::Debit,\n                    EntrySide::Cr => Side::Credit,\n                },\n            })",
+          "to": "                    EntrySide::Dr => Side::Credit,\n                    EntrySide::Cr => Side::Debit,\n                },\n            })"
+        }
+      ],
+      "mutation": "8304206cf531ae2c97c604262e3c46ff",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::facts_from_a_journal_give_a_pair_by_reference_in_the_view",
+      "killer_at": "base"
+    },
+    "S129": {
+      "what": "contra_legs: two legs on one ledger admitted",
+      "edits": [
+        {
+          "from": "(legs[0].ledger != legs[1].ledger && legs.iter().any(|leg| &leg.ledger == bank_ledger))",
+          "to": "(legs.iter().any(|leg| &leg.ledger == bank_ledger))"
+        }
+      ],
+      "mutation": "77bc751cf31bd4b61d8f715fd0a158bd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted",
+      "killer_at": "base"
+    },
+    "S130": {
+      "what": "contra_legs: a Contra off the statement's bank admitted",
+      "edits": [
+        {
+          "from": "(legs[0].ledger != legs[1].ledger && legs.iter().any(|leg| &leg.ledger == bank_ledger))",
+          "to": "(legs[0].ledger != legs[1].ledger)"
+        }
+      ],
+      "mutation": "40cad3f832d50ceaed6d300e61f9879d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_left_out_of_its_statement_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "S131": {
+      "what": "contra_legs: only the first leg checked for the bank",
+      "edits": [
+        {
+          "from": "legs.iter().any(|leg| &leg.ledger == bank_ledger))",
+          "to": "&legs[0].ledger == bank_ledger)"
+        }
+      ],
+      "mutation": "e7c8662ace6e492eef1f20cee754f4d7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "S132": {
+      "what": "lineage_facts: the oldest build decides a row",
+      "edits": [
+        {
+          "from": "            deciding.insert(voucher.txn_id.as_str(), (at, voucher));",
+          "to": "            deciding.entry(voucher.txn_id.as_str()).or_insert((at, voucher));"
+        }
+      ],
+      "mutation": "c088c5645802728870d7ba829f4ba2bc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "S133": {
+      "what": "lineage_facts: the oldest facts entry gives a Contra's reference",
+      "edits": [
+        {
+          "from": "            entries.insert(\n                txn.as_str(),",
+          "to": "            entries.entry(\n                txn.as_str()).or_insert("
+        },
+        {
+          "from": "                    facts.reversed_contras.contains(txn),\n                ),\n            );",
+          "to": "                    facts.reversed_contras.contains(txn),\n                ));"
+        }
+      ],
+      "mutation": "aafc6c32f63a4178920ab5ae6b94ec67",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_amendment_naming_one_row_keeps_the_other_from_the_original",
+      "killer_at": "base"
+    },
+    "S134": {
+      "what": "lineage_facts: a Contra's reversal dropped",
+      "edits": [
+        {
+          "from": "                    facts.reversed_contras.contains(txn),\n",
+          "to": "                    false,\n"
+        }
+      ],
+      "mutation": "4f09fad5b900c1c0c3f48dabc36550d1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S135": {
+      "what": "lineage_facts: a skip that is a voucher of its lineage admitted",
+      "edits": [
+        {
+          "from": "            if deciding.contains_key(skip.txn.as_str()) {\n                return Err",
+          "to": "            if false && deciding.contains_key(skip.txn.as_str()) {\n                return Err"
+        }
+      ],
+      "mutation": "f85a14238346c9854f33b2fc0b38449f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_named_a_skip_in_its_own_lineage_is_an_error",
+      "killer_at": "base"
+    },
+    "S136": {
+      "what": "lineage_facts: a sent build's skip not live",
+      "edits": [
+        {
+          "from": "                batch.sent || batch.found || skips.get(&key)",
+          "to": "                batch.found || skips.get(&key)"
+        }
+      ],
+      "mutation": "941756698abe9341b322bbc75b58c49b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "S137": {
+      "what": "lineage_facts: a found build's skip not live",
+      "edits": [
+        {
+          "from": "                batch.sent || batch.found || skips.get(&key)",
+          "to": "                batch.sent || skips.get(&key)"
+        }
+      ],
+      "mutation": "2bedaf5773c60ad19733abc515e05c10",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    },
+    "S138": {
+      "what": "lineage_facts: an earlier live mention forgotten",
+      "edits": [
+        {
+          "from": "                batch.sent || batch.found || skips.get(&key).is_some_and(|earlier| earlier.live);",
+          "to": "                batch.sent || batch.found;"
+        }
+      ],
+      "mutation": "82078d62cb2d9c80bf03951d8c085810",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built",
+      "killer_at": "base"
+    },
+    "S139": {
+      "what": "lineage_facts: a skip's reversal dropped",
+      "edits": [
+        {
+          "from": "                        reversed_same_day: skip.reversed_same_day,\n                    },\n                    row: skip.txn.clone(),",
+          "to": "                        reversed_same_day: false,\n                    },\n                    row: skip.txn.clone(),"
+        }
+      ],
+      "mutation": "dbf6b08834a2631dbf3fda82e2ec586d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S140": {
+      "what": "lineage_facts: a skip's reference dropped",
+      "edits": [
+        {
+          "from": "                        reference: skip.reference.clone(),\n                        lineage: lineage.clone(),",
+          "to": "                        reference: None,\n                        lineage: lineage.clone(),"
+        }
+      ],
+      "mutation": "9befe4b15e089014be41f140400d008c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built",
+      "killer_at": "base"
+    },
+    "S141": {
+      "what": "lineage_facts: a skip's other ledger taken as the bank",
+      "edits": [
+        {
+          "from": "                        other_ledger: skip.other_ledger.clone(),",
+          "to": "                        other_ledger: facts.bank_ledger.clone(),"
+        }
+      ],
+      "mutation": "4b41e1c0fbba2e4a3c110d378e1fac80",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "S142": {
+      "what": "lineage_facts: a row decided by an unverified build counted certain",
+      "edits": [
+        {
+          "from": "        .filter(|(_, (at, _))| !batches[*at].is_verified())",
+          "to": "        .filter(|(_, (at, _))| batches[*at].status.is_empty())"
+        }
+      ],
+      "mutation": "cf4d849e3de8e69f73868ec8cdb42c4b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "S143": {
+      "what": "lineage_facts: a Contra without an entry not counted",
+      "edits": [
+        {
+          "from": "                found.without_facts += 1;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "50298ba53183dfd6948fcdaaa6c5293f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_with_no_facts_entry_in_a_lineage_with_facts_is_counted_and_blocks_cover",
+      "killer_at": "base"
+    },
+    "S144": {
+      "what": "lineage_facts: a Contra without an entry not uncertain",
+      "edits": [
+        {
+          "from": "                found.without_facts += 1;\n                uncertain.insert(txn);\n",
+          "to": "                found.without_facts += 1;\n"
+        }
+      ],
+      "mutation": "74f3006d1d23a6464f6af48c8debdd62",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_the_facts_cannot_see_blocks_its_statement_bank_though_it_names_other_ledgers",
+      "killer_at": "this_commit"
+    },
+    "S145": {
+      "what": "lineage_facts: a Contra without an entry not unseen",
+      "edits": [
+        {
+          "from": "                uncertain.insert(txn);\n                unseen.insert(txn);\n            } else if",
+          "to": "                uncertain.insert(txn);\n            } else if"
+        }
+      ],
+      "mutation": "7d62799bb7b566d2456b2bf1c4d8599a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_the_facts_cannot_see_in_a_lineage_that_holds_facts_blocks_the_ledgers_it_names",
+      "killer_at": "base"
+    },
+    "S146": {
+      "what": "lineage_facts: a Journal without an entry not unseen",
+      "edits": [
+        {
+          "from": "            } else if voucher.kind == VoucherType::Journal {\n",
+          "to": "            } else if false {\n"
+        }
+      ],
+      "mutation": "fff9acd03a295c8f33ac1f759c1f0f4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_amended_off_a_bank_still_blocks_the_banks_it_named",
+      "killer_at": "base"
+    },
+    "S147": {
+      "what": "lineage_facts: a left-out Contra not counted",
+      "edits": [
+        {
+          "from": "            found.left_out += 1;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "e645b3ce864f67ab0a5886edead24b6e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "S148": {
+      "what": "lineage_facts: a left-out Contra not uncertain",
+      "edits": [
+        {
+          "from": "            found.left_out += 1;\n            uncertain.insert(txn);\n",
+          "to": "            found.left_out += 1;\n"
+        }
+      ],
+      "mutation": "c535eea75a095e526573ab939f002944",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_the_facts_cannot_see_blocks_its_statement_bank_though_it_names_other_ledgers",
+      "killer_at": "this_commit"
+    },
+    "S149": {
+      "what": "lineage_facts: a left-out Contra not unseen",
+      "edits": [
+        {
+          "from": "            uncertain.insert(txn);\n            unseen.insert(txn);\n            continue;\n        };\n        found.contras",
+          "to": "            uncertain.insert(txn);\n            continue;\n        };\n        found.contras"
+        }
+      ],
+      "mutation": "30e33b994d41e1b0d1fd6b63ce747203",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "S150": {
+      "what": "lineage_facts: a Contra dated by its first build",
+      "edits": [
+        {
+          "from": "                date: voucher.date.clone(),\n                reference: reference.clone(),",
+          "to": "                date: batches[members[0]].line.vouchers.first().map_or(voucher.date.clone(), |first| first.date.clone()),\n                reference: reference.clone(),"
+        }
+      ],
+      "mutation": "ca4167085e84e47b9b054c72d7f8fae1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::every_date_a_row_has_had_is_blocked_while_its_latest_build_is_unverified",
+      "killer_at": "base"
+    },
+    "S151": {
+      "what": "lineage_facts: a Contra's reference dropped",
+      "edits": [
+        {
+          "from": "                reference: reference.clone(),\n                statement_bank_ledger",
+          "to": "                reference: None,\n                statement_bank_ledger"
+        }
+      ],
+      "mutation": "e2bfa0c4ab7564981d4eb17c62ec46ae",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_amendment_without_facts_changes_the_amount_and_the_fact_follows_it",
+      "killer_at": "base"
+    },
+    "S152": {
+      "what": "lineage_facts: an unverified Contra read as verified",
+      "edits": [
+        {
+          "from": "                status: if batch.is_verified() {",
+          "to": "                status: if true {"
+        }
+      ],
+      "mutation": "dcf6a9f26b2e719ac4cc10d1fc4e94f1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_found_posted_stays_found_when_its_record_is_appended_again",
+      "killer_at": "base"
+    },
+    "S153": {
+      "what": "lineage_facts: an uncertain row's days not blocked",
+      "edits": [
+        {
+          "from": "                found.blocked.insert(voucher.date.clone());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "b00b271c6a478f64a078da0f9d87f3dc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "S154": {
+      "what": "lineage_facts: an unseen voucher not passed on",
+      "edits": [
+        {
+          "from": "                found.unseen.push((at, position));\n",
+          "to": ""
+        }
+      ],
+      "mutation": "7a4e5c3dced6c783b1d9ddc4955598a4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "S155": {
+      "what": "statement_banks: skip-only records' banks left out",
+      "edits": [
+        {
+          "from": "    banks.extend(\n        skip_records.map(|record| LedgerGuid::new(record.statement.bank_ledger_guid.as_str())),\n    );\n",
+          "to": "    let _ = skip_records;\n"
+        }
+      ],
+      "mutation": "e4a4bf5b67de0df09231da69725690a3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "S156": {
+      "what": "block_voucher: an unbound ledger matched ignoring case",
+      "edits": [
+        {
+          "from": "                .find(|bound| bound.name == entry.ledger)\n                .map(|bound| LedgerGuid::new",
+          "to": "                .find(|bound| bound.name.eq_ignore_ascii_case(&entry.ledger))\n                .map(|bound| LedgerGuid::new"
+        }
+      ],
+      "mutation": "a7b1c92f5c4cbb29c78139047f07343d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_ledger_named_in_another_case_than_the_binding_blocks_every_ledger",
+      "killer_at": "this_commit"
+    },
+    "S157": {
+      "what": "block_voucher: a Journal with one bank leg blocks",
+      "edits": [
+        {
+          "from": "        if named.len() < 2 && ledgers.iter().all(Option::is_some) {\n            return;\n        }",
+          "to": ""
+        }
+      ],
+      "mutation": "fb4cc7c0c43c7dd0915fbbac71494b78",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_naming_one_statement_bank_blocks_nothing",
+      "killer_at": "base"
+    },
+    "S158": {
+      "what": "block_voucher: a Journal with two banks passes",
+      "edits": [
+        {
+          "from": "if named.len() < 2 && ledgers.iter().all(Option::is_some) {",
+          "to": "if named.len() < 3 && ledgers.iter().all(Option::is_some) {"
+        }
+      ],
+      "mutation": "0074c8d9cc5cd6170aa5f305c8330b8d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "S159": {
+      "what": "block_voucher: a Journal naming an unbound ledger passes",
+      "edits": [
+        {
+          "from": "if named.len() < 2 && ledgers.iter().all(Option::is_some) {",
+          "to": "if named.len() < 2 {"
+        }
+      ],
+      "mutation": "6934b190bfa8d7e48de9189152b909b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_naming_a_ledger_its_build_did_not_bind_blocks_every_ledger",
+      "killer_at": "base"
+    },
+    "S160": {
+      "what": "block_voucher: a Contra's banks treated as a Journal's",
+      "edits": [
+        {
+          "from": "    if voucher.kind == VoucherType::Journal {\n        let named",
+          "to": "    if voucher.kind != VoucherType::Journal {\n        let named"
+        }
+      ],
+      "mutation": "804109a789b9bb3e02c75330bd94f8cd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_naming_one_statement_bank_blocks_nothing",
+      "killer_at": "base"
+    },
+    "S161": {
+      "what": "block_voucher: the id's date not blocked",
+      "edits": [
+        {
+          "from": "        days.extend(TallyDate::parse(voucher.txn_id[3..11].to_string()).ok());",
+          "to": "        let _ = &days;"
+        }
+      ],
+      "mutation": "45e4f981c8aaee1acfc79ca30c414277",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_statement_row_blocks_the_day_its_id_carries_as_well_as_its_date",
+      "killer_at": "base"
+    },
+    "S162": {
+      "what": "block_voucher: the id's date read one place over",
+      "edits": [
+        {
+          "from": "voucher.txn_id[3..11]",
+          "to": "voucher.txn_id[4..12]"
+        }
+      ],
+      "mutation": "f458ced1c4aa3af4b2a1a262c2280671",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_statement_row_blocks_the_day_its_id_carries_as_well_as_its_date",
+      "killer_at": "base"
+    },
+    "S163": {
+      "what": "block_voucher: the endpoint dropped from the key",
+      "edits": [
+        {
+          "from": "            .entry((endpoint.clone(), ledger))",
+          "to": "            .entry((None, ledger))"
+        }
+      ],
+      "mutation": "90f76237d58a7952afd2c4581f5d14e7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "S164": {
+      "what": "block_voucher: the ledger dropped from the key",
+      "edits": [
+        {
+          "from": "            .entry((endpoint.clone(), ledger))",
+          "to": "            .entry((endpoint.clone(), ledger.filter(|_| false)))"
+        }
+      ],
+      "mutation": "538d864cc75e6c5dd04fdde56b3d4188",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "S165": {
+      "what": "build: the company GUID taken as written",
+      "edits": [
+        {
+          "from": "let company = CompanyGuid::new(canonical_batch_guid(company_guid));",
+          "to": "let company = CompanyGuid::new(company_guid);"
+        }
+      ],
+      "mutation": "8a70fdc3bce7df1368f4da308d3de6c5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_only_record_is_read_whatever_the_case_of_its_company_guid",
+      "killer_at": "base"
+    },
+    "S166": {
+      "what": "build: a row's latest holder kept as the first",
+      "edits": [
+        {
+          "from": "            held.latest = at;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "1d223bbc6f43123ddc9f735e2986c444",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_held_by_two_batches_names_the_latest_in_the_journal",
+      "killer_at": "base"
+    },
+    "S167": {
+      "what": "build: skip-only records of other companies give banks",
+      "edits": [
+        {
+          "from": "    let banks = statement_banks(\n        &batches,\n        skip_records\n            .iter()\n            .filter(|record| record.company_guid.eq_ignore_ascii_case(company_guid)),\n    );",
+          "to": "    let banks = statement_banks(\n        &batches,\n        skip_records\n            .iter(),\n    );"
+        }
+      ],
+      "mutation": "a6203de24cf59590d2a071858b180c8c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::another_company_s_skip_only_record_names_no_statement_bank",
+      "killer_at": "this_commit"
+    },
+    "S168": {
+      "what": "build: a lineage without facts not blocked",
+      "edits": [
+        {
+          "from": "            for &at in members {\n                block_unseen(&batches[at], &banks, &mut blocked);\n            }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "865bc88c5fc29a49f47c8068f0a99d4d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "S169": {
+      "what": "build: a lineage with some facts treated as one with none",
+      "edits": [
+        {
+          "from": "if members.iter().all(|&at| batches[at].facts.is_none()) {",
+          "to": "if members.iter().any(|&at| batches[at].facts.is_none()) {"
+        }
+      ],
+      "mutation": "71ee7a32a275b0513277179eca9195be",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "S170": {
+      "what": "build: a lineage's unseen vouchers not blocked",
+      "edits": [
+        {
+          "from": "        for &(at, position) in &found.unseen {\n            block_voucher(\n                &batches[at],\n                &batches[at].line.vouchers[position],\n                &banks,\n                &mut blocked,\n            );\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "6e92e87d3517ed4b280660a881d3f5fc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names",
+      "killer_at": "base"
+    },
+    "S171": {
+      "what": "build: left-out Contras not counted",
+      "edits": [
+        {
+          "from": "        contras_not_two_leg += found.left_out;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "c1eb4a62a9e3505a7012d64a6883c6a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_later_given_another_type_is_left_out",
+      "killer_at": "base"
+    },
+    "S172": {
+      "what": "build: Contras without facts not counted",
+      "edits": [
+        {
+          "from": "        contras_without_facts += found.without_facts;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "8a778e1f137804e01d3c3f644426e9e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_with_no_facts_entry_in_a_lineage_with_facts_is_counted_and_blocks_cover",
+      "killer_at": "base"
+    },
+    "S173": {
+      "what": "build: a lineage's blocked days not kept",
+      "edits": [
+        {
+          "from": "                .extend(found.blocked.iter().cloned());\n",
+          "to": "                .extend(std::iter::empty::<TallyDate>());\n"
+        }
+      ],
+      "mutation": "b7a19e8686be08d87152da42e2f6b953",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "S174": {
+      "what": "build: a lineage's blocked days kept for any endpoint",
+      "edits": [
+        {
+          "from": "            .entry((Some(endpoint.clone()), Some(ledger.clone())))",
+          "to": "            .entry((None, Some(ledger.clone())))"
+        }
+      ],
+      "mutation": "4ec797754ffc3688d88a54d40a59b765",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "S175": {
+      "what": "build: an unverified lineage's windows kept",
+      "edits": [
+        {
+          "from": "if found.all_verified && found.left_out == 0 && found.without_facts == 0 {",
+          "to": "if found.left_out == 0 && found.without_facts == 0 {"
+        }
+      ],
+      "mutation": "b0629382b1fdaf72aea2751c7ea96e69",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_with_a_row_outside_its_window_still_adds_no_cover",
+      "killer_at": "base"
+    },
+    "S176": {
+      "what": "build: a lineage with a left-out Contra keeps its windows",
+      "edits": [
+        {
+          "from": "if found.all_verified && found.left_out == 0 && found.without_facts == 0 {",
+          "to": "if found.all_verified && found.without_facts == 0 {"
+        }
+      ],
+      "mutation": "90a84c78ddbd9c0a55c77a242d05ce83",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_with_a_row_the_facts_cannot_see_adds_no_window_whatever_the_row_s_day",
+      "killer_at": "this_commit"
+    },
+    "S177": {
+      "what": "build: a lineage with a Contra without facts keeps its windows",
+      "edits": [
+        {
+          "from": "if found.all_verified && found.left_out == 0 && found.without_facts == 0 {",
+          "to": "if found.all_verified && found.left_out == 0 {"
+        }
+      ],
+      "mutation": "c43f2d4a568a2c50a999eaacbacd0d49",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_with_a_row_the_facts_cannot_see_adds_no_window_whatever_the_row_s_day",
+      "killer_at": "this_commit"
+    },
+    "S178": {
+      "what": "build: a lineage's skips not merged",
+      "edits": [
+        {
+          "from": "        for mention in found.skips.into_values() {\n            mention.merge_into(&mut mentions);\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "6bc27efb54d6c730b40beadeadbbeb16",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S179": {
+      "what": "build: skip-only records of other companies read",
+      "edits": [
+        {
+          "from": "    for record in skip_records\n        .iter()\n        .filter(|record| record.company_guid.eq_ignore_ascii_case(company_guid))\n    {",
+          "to": "    for record in skip_records\n        .iter()\n    {"
+        }
+      ],
+      "mutation": "e9fa59b54107fb708c57b626791133a5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_of_another_company_are_not_read",
+      "killer_at": "base"
+    },
+    "S180": {
+      "what": "build: skip-only records compared with the company's case",
+      "edits": [
+        {
+          "from": "    for record in skip_records\n        .iter()\n        .filter(|record| record.company_guid.eq_ignore_ascii_case(company_guid))\n    {",
+          "to": "    for record in skip_records\n        .iter()\n        .filter(|record| record.company_guid == company_guid)\n    {"
+        }
+      ],
+      "mutation": "10a6dcc04691d9a2ddb2a8c40527a756",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_only_record_is_read_for_the_company_asked_in_another_case",
+      "killer_at": "this_commit"
+    },
+    "S181": {
+      "what": "build: two skip-only records sharing an id admitted",
+      "edits": [
+        {
+          "from": "        if !record_ids.insert(record.record_id.as_str()) {",
+          "to": "        if !record_ids.insert(record.record_id.as_str()) && false {"
+        }
+      ],
+      "mutation": "912012e3e20c11954d1443ab08357010",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "S182": {
+      "what": "build: a skip-only record with no endpoint admitted",
+      "edits": [
+        {
+          "from": "        if record.endpoint_origin.is_empty() {\n            return Err(TransferFactsError::MissingEndpoint {",
+          "to": "        if false {\n            return Err(TransferFactsError::MissingEndpoint {"
+        }
+      ],
+      "mutation": "6d4343626a608451577e86375494a498",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_are_checked_whole",
+      "killer_at": "base"
+    },
+    "S183": {
+      "what": "build: a skip-only record's window dropped",
+      "edits": [
+        {
+          "from": "            windows.push((endpoint.clone(), facts.bank_ledger.clone(), window));",
+          "to": "            let _ = window;"
+        }
+      ],
+      "mutation": "c0a0bae52a24587a2585a13b4edcdc4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_only_record_adds_its_window",
+      "killer_at": "base"
+    },
+    "S184": {
+      "what": "build: a skip-only record's skips not live",
+      "edits": [
+        {
+          "from": "            SkipMention {\n                live: true,",
+          "to": "            SkipMention {\n                live: false,"
+        }
+      ],
+      "mutation": "5c5a749487de1b9b068cbfd571020fc6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "S185": {
+      "what": "build: a skip-only record's skips given the lineage of a batch",
+      "edits": [
+        {
+          "from": "lineage: LineageId::new(record.record_id.as_str()),",
+          "to": "lineage: LineageId::new(record.company_guid.as_str()),"
+        }
+      ],
+      "mutation": "e80b0464ba1d3f187029e2331de98e84",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::skip_only_records_join_the_merge_by_built_at",
+      "killer_at": "base"
+    },
+    "S186": {
+      "what": "build: a skip-only record's skip reversal dropped",
+      "edits": [
+        {
+          "from": "                    reversed_same_day: skip.reversed_same_day,\n                },\n                row: skip.txn,",
+          "to": "                    reversed_same_day: false,\n                },\n                row: skip.txn,"
+        }
+      ],
+      "mutation": "3f44de4b3983e5480fb456e920248e0b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::the_same_day_reversal_flag_follows_each_row_into_the_facts",
+      "killer_at": "base"
+    },
+    "S187": {
+      "what": "build: an unsent batch's withdrawals counted",
+      "edits": [
+        {
+          "from": "        if !(batch.sent || batch.found) {\n            continue;\n        }",
+          "to": ""
+        }
+      ],
+      "mutation": "0517e7f1329e00e5d854930fc7949711",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_withdrawal_counts_only_from_a_build_sent_or_found_posted",
+      "killer_at": "base"
+    },
+    "S188": {
+      "what": "build: a found batch's withdrawals not counted",
+      "edits": [
+        {
+          "from": "if !(batch.sent || batch.found) {",
+          "to": "if !batch.sent {"
+        }
+      ],
+      "mutation": "9a4fb52fc765b8da8fd95f177d4dc5be",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S189": {
+      "what": "build: a sent batch's withdrawals not counted",
+      "edits": [
+        {
+          "from": "if !(batch.sent || batch.found) {",
+          "to": "if !batch.found {"
+        }
+      ],
+      "mutation": "a88215314bff4fa02f78a623272642bf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view",
+      "killer_at": "base"
+    },
+    "S190": {
+      "what": "build: the oldest withdrawal kept",
+      "edits": [
+        {
+          "from": "            *newest = (*newest).max(built);",
+          "to": "            *newest = (*newest).min(built);"
+        }
+      ],
+      "mutation": "b7a692377401ff4f7e7fb59e113ba012",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_lineage_s_newest_withdrawal_is_the_one_compared",
+      "killer_at": "this_commit"
+    },
+    "S191": {
+      "what": "build: withdrawals of one lineage counted for another",
+      "edits": [
+        {
+          "from": "                .entry((batch.line.lineage.as_str(), row.as_str()))",
+          "to": "                .entry((\"\", row.as_str()))"
+        },
+        {
+          "from": "                        .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))",
+          "to": "                        .get(&(\"\", mention.row.as_str()))"
+        }
+      ],
+      "mutation": "4ef2be78a0e45763a6b81c734e8919b9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    },
+    "S192": {
+      "what": "build: a withdrawal counted whenever it was built",
+      "edits": [
+        {
+          "from": ".is_none_or(|recorded| !withdrawal_counts(recorded, &mention.built))",
+          "to": ".is_none()"
+        }
+      ],
+      "mutation": "0923b18c620e83e8818c02963361a8e9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_made_after_the_withdrawal_is_not_retired_by_it",
+      "killer_at": "base"
+    },
+    "S193": {
+      "what": "build: a contradicting holder that is only ever found",
+      "edits": [
+        {
+          "from": ".find(|&at| batches[at].found && unwithdrawn(at));",
+          "to": ".find(|&at| batches[at].ever_found && unwithdrawn(at));"
+        }
+      ],
+      "mutation": "a57142d1123439024e188fb1fa1a2a76",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_restored_batch_never_posts_against_a_skip",
+      "killer_at": "base"
+    },
+    "S194": {
+      "what": "build: a contradicting holder that withdrew the skip",
+      "edits": [
+        {
+          "from": ".find(|&at| batches[at].found && unwithdrawn(at));",
+          "to": ".find(|&at| batches[at].found);"
+        }
+      ],
+      "mutation": "36dd38d32125a86b4395edb411453841",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    },
+    "S195": {
+      "what": "build: retirement needs no holder ever found",
+      "edits": [
+        {
+          "from": "                    holding.batches.iter().any(|&at| batches[at].ever_found)\n                        && !holding",
+          "to": "                    !holding"
+        }
+      ],
+      "mutation": "ec9e00dfe50ee2febea24a4fcde02e8b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not",
+      "killer_at": "base"
+    },
+    "S196": {
+      "what": "build: retirement ignores an unwithdrawn holder",
+      "edits": [
+        {
+          "from": "                        && !holding\n                            .batches\n                            .iter()\n                            .any(|&at| batches[at].ever_found && unwithdrawn(at));",
+          "to": ";"
+        }
+      ],
+      "mutation": "3d000331fac0a1167b75afdd719aa711",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    },
+    "S197": {
+      "what": "build: a skip retired by a covered holder",
+      "edits": [
+        {
+          "from": "match (contradicting, retired_without_cover && any_posted) {",
+          "to": "match (contradicting, retired_without_cover) {"
+        }
+      ],
+      "mutation": "cf98f41f7815dbec2b7e14e74e05e8ca",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_row_names_the_restored_batch_that_holds_it",
+      "killer_at": "base"
+    },
+    "S198": {
+      "what": "build: a retired skip not counted",
+      "edits": [
+        {
+          "from": "                        retired_skips += 1;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "dd0fa3398f5e55e5b26097d1db695d20",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_first_written_unverified_and_written_again_verified_is_found",
+      "killer_at": "base"
+    },
+    "S199": {
+      "what": "build: a posted holder's skip held as unverified",
+      "edits": [
+        {
+          "from": "                        by: HeldBy::PostedBatch,",
+          "to": "                        by: HeldBy::UnverifiedBatch,"
+        }
+      ],
+      "mutation": "0cd430f3d177fbf048c7497cffe8913f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_restored_batch_never_posts_against_a_skip",
+      "killer_at": "base"
+    },
+    "S200": {
+      "what": "build: a posted holder's skip not paired",
+      "edits": [
+        {
+          "from": "                        by: HeldBy::PostedBatch,\n                        pairs: true,",
+          "to": "                        by: HeldBy::PostedBatch,\n                        pairs: false,"
+        }
+      ],
+      "mutation": "4128ad3454954d8a7c4ee581be4a4fbf",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_a_posted_batch_contradicts_pairs",
+      "killer_at": "this_commit"
+    },
+    "S201": {
+      "what": "build: an unverified holder named without its covered batch first",
+      "edits": [
+        {
+          "from": "                                .find(|&at| batches[at].covered)\n                                .unwrap_or(holding.latest)]",
+          "to": "                                .find(|_| false)\n                                .unwrap_or(holding.latest)]"
+        }
+      ],
+      "mutation": "c0946b0817333119ec185a87360dd30e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_held_row_names_the_restored_batch_that_holds_it",
+      "killer_at": "base"
+    },
+    "S202": {
+      "what": "build: the oldest covered holder named",
+      "edits": [
+        {
+          "from": "                                .iter()\n                                .rev()\n                                .copied()\n                                .find(|&at| batches[at].covered)",
+          "to": "                                .iter()\n                                .copied()\n                                .find(|&at| batches[at].covered)"
+        }
+      ],
+      "mutation": "6b63fd8235199fc5f18c8ae9c86108b3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::the_latest_restored_holder_is_named",
+      "killer_at": "this_commit"
+    },
+    "S203": {
+      "what": "build: an unverified holder's skip always pairs",
+      "edits": [
+        {
+          "from": "                        pairs: !retired_but_for_cover,",
+          "to": "                        pairs: true,"
+        }
+      ],
+      "mutation": "41888a9df74815e243ba42ef01e4a04b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view",
+      "killer_at": "base"
+    },
+    "S204": {
+      "what": "build: a skip retired but for cover still mentioned",
+      "edits": [
+        {
+          "from": "                if retired_but_for_cover {\n                    continue;\n                }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "cfbdf25967b1aa7f6ef231f087ab2799",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view",
+      "killer_at": "base"
+    },
+    "S205": {
+      "what": "build: a skip's build time not kept",
+      "edits": [
+        {
+          "from": "        skip_built.insert(key.clone(), mention.built);\n",
+          "to": ""
+        }
+      ],
+      "mutation": "426204692c83275f6e1a9b55de54f700",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send",
+      "killer_at": "base"
+    },
+    "S206": {
+      "what": "build: a mention not kept",
+      "edits": [
+        {
+          "from": "        skip_mentions.insert(key.clone());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "3daa303a9f2a9f7d421eb56e1a10f6a8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_skip_that_was_never_sent_can_be_withdrawn_and_is_known_to_the_facts",
+      "killer_at": "base"
+    },
+    "S207": {
+      "what": "build: a live skip not kept",
+      "edits": [
+        {
+          "from": "        if live {\n            live_skips.insert(key);\n        }",
+          "to": "        let _ = (live, key);"
+        }
+      ],
+      "mutation": "7f3a675b95fc6c73e31327d2f40efb4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skipped_row_is_refused_before_the_dialog_on_both_surfaces",
+      "killer_at": "base"
+    },
+    "S208": {
+      "what": "build: a sent Contra superseded",
+      "edits": [
+        {
+          "from": "        let superseded = !batch.sent\n            && !batch.found",
+          "to": "        let superseded = !batch.found"
+        }
+      ],
+      "mutation": "45a621d3f9f929711c57006b90348f3f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "S209": {
+      "what": "build: a found Contra superseded",
+      "edits": [
+        {
+          "from": "            && !batch.found\n            && is_statement_txn_id(&decided.txn)",
+          "to": "            && is_statement_txn_id(&decided.txn)"
+        }
+      ],
+      "mutation": "2897be0ebd97538c52a7dde8102bb923",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rebuild_once_found_posted_is_not_superseded_whatever_its_status_now",
+      "killer_at": "base"
+    },
+    "S210": {
+      "what": "build: a Contra of any id superseded",
+      "edits": [
+        {
+          "from": "            && is_statement_txn_id(&decided.txn)\n            && holders",
+          "to": "            && holders"
+        }
+      ],
+      "mutation": "d0f66123bb1dc5a00c8942928429adb4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_contra_is_superseded_only_by_a_batch_holding_a_statement_id",
+      "killer_at": "base"
+    },
+    "S211": {
+      "what": "build: a Contra superseded by its own lineage",
+      "edits": [
+        {
+          "from": "                    batches[at].line.lineage != batch.line.lineage\n                        && (batches[at].sent",
+          "to": "                    (batches[at].sent"
+        }
+      ],
+      "mutation": "b232a27074321102880e75bcaff04042",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "S212": {
+      "what": "build: a Contra superseded by an unsent holder",
+      "edits": [
+        {
+          "from": "                        && (batches[at].sent || batches[at].found)",
+          "to": "                        && batches[at].found"
+        }
+      ],
+      "mutation": "a4489d9dcc63763ba868813b8b31218e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "S213": {
+      "what": "build: a Contra superseded by an unfound holder",
+      "edits": [
+        {
+          "from": "                        && (batches[at].sent || batches[at].found)",
+          "to": "                        && batches[at].sent"
+        }
+      ],
+      "mutation": "99966e337c589cca7c3f6501e243e578",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "S214": {
+      "what": "build: a superseded Contra not counted",
+      "edits": [
+        {
+          "from": "            contras_superseded += 1;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "4afe5607a05d204c0f371ffaa128ac36",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::an_unsent_unfound_contra_is_dropped_once_another_lineage_holds_its_row",
+      "killer_at": "base"
+    },
+    "S215": {
+      "what": "build: the Contras left in journal order",
+      "edits": [
+        {
+          "from": "    kept.sort_by(|left, right| left.key.cmp(&right.key));\n",
+          "to": ""
+        }
+      ],
+      "mutation": "c059c7b4e914ec3ab848d3498af77a0e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::the_contras_are_given_in_key_order",
+      "killer_at": "this_commit"
+    },
+    "S216": {
+      "what": "build: a window's own ledger key not checked",
+      "edits": [
+        {
+          "from": "            (Some(endpoint.clone()), Some(bank_ledger.clone())),\n            (Some(endpoint.clone()), None),",
+          "to": "            (Some(endpoint.clone()), None),"
+        }
+      ],
+      "mutation": "5ae885154b6ba639c05cce847febda20",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal",
+      "killer_at": "base"
+    },
+    "S217": {
+      "what": "build: an endpoint-wide block not checked",
+      "edits": [
+        {
+          "from": "            (Some(endpoint.clone()), None),\n            (None, Some",
+          "to": "            (None, Some"
+        }
+      ],
+      "mutation": "5220aa8c179d8151461fc9aca66025b3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_journal_naming_a_ledger_its_build_did_not_bind_blocks_every_ledger",
+      "killer_at": "base"
+    },
+    "S218": {
+      "what": "build: a ledger-wide block not checked",
+      "edits": [
+        {
+          "from": "            (None, Some(bank_ledger.clone())),\n            (None, None),",
+          "to": "            (None, None),"
+        }
+      ],
+      "mutation": "aceeb8918b1e364f975ac89d178d6941",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_ledger_or_endpoint_a_batch_did_not_bind_blocks_every_ledger",
+      "killer_at": "base"
+    },
+    "S219": {
+      "what": "build: an any-key block not checked",
+      "edits": [
+        {
+          "from": "            (None, Some(bank_ledger.clone())),\n            (None, None),\n        ]",
+          "to": "            (None, Some(bank_ledger.clone())),\n        ]"
+        }
+      ],
+      "mutation": "35c6a4bb41f4ac7cc61f5a1b462eea07",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_ledger_or_endpoint_a_batch_did_not_bind_blocks_every_ledger",
+      "killer_at": "base"
+    },
+    "S220": {
+      "what": "build: a block on the window's last day ignored",
+      "edits": [
+        {
+          "from": "days.range(window.from.clone()..=window.to.clone())",
+          "to": "days.range(window.from.clone()..window.to.clone())"
+        }
+      ],
+      "mutation": "b1aaa029b5292edb479a092245f2a46b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date",
+      "killer_at": "base"
+    },
+    "S221": {
+      "what": "build: a block before the window counted",
+      "edits": [
+        {
+          "from": "days.range(window.from.clone()..=window.to.clone())",
+          "to": "days.range(..=window.to.clone())"
+        }
+      ],
+      "mutation": "1bd76c7497a9b1b32e838643977b9cf1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::statement_facts::tests::a_day_blocked_before_a_window_leaves_it_whole",
+      "killer_at": "this_commit"
+    },
+    "S222": {
+      "what": "build: a block after the window counted",
+      "edits": [
+        {
+          "from": "days.range(window.from.clone()..=window.to.clone())",
+          "to": "days.range(window.from.clone()..)"
+        }
+      ],
+      "mutation": "81e24a8374941b04fd0b24b25fec5bef",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names",
+      "killer_at": "base"
+    },
+    "S223": {
+      "what": "build: an uncovered batch restored",
+      "edits": [
+        {
+          "from": "        .filter(|batch| batch.covered)\n        .map(|batch| batch.line.batch_id.clone())",
+          "to": "        .filter(|batch| batch.covered || batch.ever_found)\n        .map(|batch| batch.line.batch_id.clone())"
+        }
+      ],
+      "mutation": "2d92f9243ce25b2d1f1aa0528d0517b7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::statement_facts::tests::a_rollback_never_retires_a_skip_master_holds",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "869:51 replace > with >= in SkipMention::merge_into": {
+      "reason": "equivalent: two mentions of one row tie on build time and source id only when they come from one source, and one source mentions a row once. A batch's facts refuse a row id named twice, the journal folds a batch to one entry in one lineage, a lineage keeps one mention per row, and a repeated skip-only record id is refused before its mentions merge. Bridge writes a batch id as bridge- and a version 4 UUID and a skip-only record id as skips- and one (validate_skip_record refuses any other), so neither names the other. A journal holding a batch id of the skip-only form, or a change that lets one source mention a row twice, reopens it"
+    },
+    "930:65 replace && with || in contra_legs": {
+      "reason": "equivalent, unreachable: an entry's amount reaches contra_legs only through BuildVoucher::of_vouchers, the one place a BuildEntry is made, from the voucher's ImportAmount, and ImportAmount::parse refuses an amount that is zero or carries a sign; both amounts are therefore positive, and the filter passes them whichever way its two conditions are joined. A change that makes a BuildEntry from another source, or lets ImportAmount hold zero or a signed amount, reopens it"
+    },
+    "S012": {
+      "mutation": "5c613655433edc2c125b977585625019",
+      "reason": "equivalent: serde's derive reads an absent field of an Option type as None without #[serde(default)], so the attribute changes nothing a record reads or writes. A change to the field's type, or a deserialize_with on it, reopens it"
+    },
+    "S013": {
+      "mutation": "16d9a442350383fb27de6be8d9b6c4be",
+      "reason": "equivalent, unreachable: the binding of_statement is given comes from bind_ledgers over requested names that include every name the statement uses (ResolvedStatement::ledger_names), each bound by its exact spelling or the build fails (StandardLedgerCatalog::bind_selected); unbindable_masters refuses two requested names that fold equal, case included (twin_fold_keys), but for a pair that differs by a line break, of which only one may be requested. So no binding holds two names equal but for ASCII case, and the search that ignores case finds the exact name. A caller that passes a binding holding two such names reopens it"
+    },
+    "S014": {
+      "mutation": "931d5f8d487aa50a0069fba2a59d6ed1",
+      "reason": "equivalent, unreachable: the binding of_statement is given comes from bind_ledgers over requested names that include every name the statement uses (ResolvedStatement::ledger_names), each bound by its exact spelling or the build fails (StandardLedgerCatalog::bind_selected); unbindable_masters refuses two requested names that fold equal, case included (twin_fold_keys), but for a pair that differs by a line break, of which only one may be requested. So every name of_statement looks up is in its binding and the fallback is never read. A caller that passes a binding missing a statement name reopens it; validate_statement_facts refuses the empty GUID base gives such a name"
+    },
+    "S043": {
+      "mutation": "cd6e89d2fbc574da3a864fc4d8c964e1",
+      "reason": "equivalent: ExactDecimal::parse refuses a text with a second decimal point, so any amount it admits holds at most one, where the first and the last split agree. A change to that parser reopens it"
+    },
+    "S124": {
+      "mutation": "9e1c877817a9292f015fbedcef60214b",
+      "reason": "equivalent: the arm is taken only when the two legs' canonical amounts are equal strings, so parsing either gives the same amount. A change to the arm's guard reopens it"
+    },
+    "S125": {
+      "mutation": "c32573964da0f4d61cf2a550b1c38169",
+      "reason": "equivalent, unreachable: an entry's amount reaches contra_legs only through BuildVoucher::of_vouchers, the one place a BuildEntry is made, from the voucher's ImportAmount, and ImportAmount::parse refuses an amount that is zero or carries a sign; both amounts are therefore positive, so none is zero. A change that makes a BuildEntry from another source, or lets ImportAmount hold zero or a signed amount, reopens it"
+    },
+    "S126": {
+      "mutation": "de525c4701c5dbb838ff5657d4fb19f4",
+      "reason": "equivalent, unreachable: an entry's amount reaches contra_legs only through BuildVoucher::of_vouchers, the one place a BuildEntry is made, from the voucher's ImportAmount, and ImportAmount::parse refuses an amount that is zero or carries a sign; both amounts are therefore positive, so none is negative. A change that makes a BuildEntry from another source, or lets ImportAmount hold zero or a signed amount, reopens it"
+    }
+  }
+}

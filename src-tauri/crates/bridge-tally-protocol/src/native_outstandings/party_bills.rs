@@ -8,8 +8,8 @@
 //!
 //! - **The request** takes a to-date only, the party as the text of the
 //!   `LedgerName` static variable, and no fetch list. The name is admitted
-//!   through [`LedgerScopeName`] and nothing wider: a name it refuses is never
-//!   sent.
+//!   through [`LedgerOutstandingsParty`], the marks the lab read in that
+//!   variable (protocol reference §12a.34): a name it refuses is never sent.
 //! - **The answer** is the flat grammar of the Bills reports without a party
 //!   per row: a `BILLFIXED` opens each bill, its `BILLOP`, `BILLCL`, `BILLDUE`
 //!   and `BILLOVERDUE` follow as siblings, then zero or more groups of
@@ -27,25 +27,31 @@ use bridge_tally_primitives::{ExactDecimal, TallyDate};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
-use crate::ledger_scope::LedgerScopeName;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use crate::xml_text::escape_text as xml_escape;
 
 use super::date::{parse_native_bill_date, parse_native_due_date};
+use super::party_name::LedgerOutstandingsParty;
 
 /// The reference text Tally gives an On Account row.
 const ON_ACCOUNT_REFERENCE: &str = "On Account";
 
 /// The `Ledger Outstandings` request for one party at one to-date.
 pub fn render_ledger_outstandings_request(
-    company: &str,
-    party: &LedgerScopeName,
+    company: &ValidatedCompanyName,
+    party: &LedgerOutstandingsParty,
     to: &TallyDate,
 ) -> String {
+    let static_variables = company.xml_static_variables(
+        "",
+        &format!(
+            r#"<LedgerName>{party}</LedgerName><SVTODATE TYPE="Date">{to}</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><EXPLODEFLAG>Yes</EXPLODEFLAG>"#,
+            party = xml_escape(party.as_str()),
+            to = to.as_str(),
+        ),
+    );
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Ledger Outstandings</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><LedgerName>{party}</LedgerName><SVTODATE TYPE="Date">{to}</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
-        party = xml_escape(party.as_str()),
-        to = to.as_str(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Ledger Outstandings</ID></HEADER><BODY><DESC>{static_variables}</DESC></BODY></ENVELOPE>"#
     )
 }
 
@@ -101,8 +107,10 @@ impl PartyBillsAnswer {
                 ledger_closing: ledger_closing.clone(),
             });
         }
-        // What Tally answers for a bill-wise party with no open bills is not
-        // measured, so an answer with no rows is not told as one (P1).
+        // An envelope with no rows has not been seen, so it is not told as no
+        // open bills (P1). Tally's answer with no bytes at all, which it sends a
+        // party it reports nothing for, never reaches this parse: the runtime
+        // tells it against the snapshot (protocol reference §12a.27).
         if self.bills.is_empty() {
             return Err(PartyBillsRefusal::NoRowsNotEstablished);
         }

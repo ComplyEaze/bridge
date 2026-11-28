@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 
 import {
-  VERSION_FILES, bump, checkArguments, classify, draftNotes, latestReleaseTag, levelFor, propose, pullNumbers, readVersions, run, writeVersions,
+  RELEASE_DATE_FILE, VERSION_FILES, bump, checkArguments, checkReleaseDate, classify, draftNotes, latestReleaseTag, levelFor, propose, pullNumbers, readVersions, run, writeVersions,
 } from "./next-version.mjs";
 
 const repository = resolve(import.meta.dirname, "..");
@@ -102,18 +102,19 @@ test("draft notes group titles by kind and mark themselves as a draft", () => {
   assert.match(notes, /- change 5 \(#5\)/);
 });
 
-test("writing a version changes exactly the five version files and the README sentence", () => {
+test("writing a version changes exactly the five version files, the README sentence and the release date", () => {
   const base = mkdtempSync(join(tmpdir(), "next-version-"));
   try {
-    for (const file of [...Object.keys(VERSION_FILES), "README.md"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE]) {
       mkdirSync(dirname(join(base, file)), { recursive: true });
       copyFileSync(join(repository, file), join(base, file));
     }
     const before = readVersions(base);
     assert.equal(new Set(Object.values(before)).size, 1, "the repository's own version files agree");
     const next = bump(Object.values(before)[0], "minor");
-    writeVersions(next, base);
+    writeVersions(next, base, "2031-02-03");
     assert.deepEqual(Object.values(readVersions(base)), Object.keys(VERSION_FILES).map(() => next));
+    assert.equal(readFileSync(join(base, RELEASE_DATE_FILE), "utf8"), "2031-02-03\n", "the release date is one line");
     assert.match(readFileSync(join(base, "README.md"), "utf8"), new RegExp(`current development source is version \`${next.replaceAll(".", "\\.")}\``));
     const old = Object.values(before)[0];
     const original = readFileSync(join(repository, "src-tauri/Cargo.lock"), "utf8");
@@ -125,10 +126,20 @@ test("writing a version changes exactly the five version files and the README se
   }
 });
 
+test("a release date must be a real day, no earlier than the last tag's and no later than today", () => {
+  assert.equal(checkReleaseDate("2026-11-10", { tagDay: "2026-10-30", today: "2026-11-10" }), "2026-11-10", "today is allowed");
+  assert.equal(checkReleaseDate("2026-10-30", { tagDay: "2026-10-30", today: "2026-11-10" }), "2026-10-30", "the tag's own day is allowed");
+  assert.throws(() => checkReleaseDate("2026-10-29", { tagDay: "2026-10-30", today: "2026-11-10" }), /earlier than the last release tag's day, 2026-10-30/);
+  assert.throws(() => checkReleaseDate("2026-11-11", { tagDay: "2026-10-30", today: "2026-11-10" }), /later than today, 2026-11-10/);
+  for (const bad of ["", "2026-13-01", "2026-02-30", "20261110", "2026-11-1", "2026-11-10\n"]) {
+    assert.throws(() => checkReleaseDate(bad, { tagDay: "2026-10-30", today: "2026-11-10" }), /not a YYYY-MM-DD day/, JSON.stringify(bad));
+  }
+});
+
 test("a file with two candidate version lines is refused, not half-written", () => {
   const base = mkdtempSync(join(tmpdir(), "next-version-"));
   try {
-    for (const file of [...Object.keys(VERSION_FILES), "README.md"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE]) {
       mkdirSync(dirname(join(base, file)), { recursive: true });
       copyFileSync(join(repository, file), join(base, file));
     }
@@ -145,7 +156,7 @@ test("a file with two candidate version lines is refused, not half-written", () 
 test("a README with two current-version sentences is refused before any file is written", () => {
   const base = mkdtempSync(join(tmpdir(), "next-version-"));
   try {
-    for (const file of [...Object.keys(VERSION_FILES), "README.md"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE]) {
       mkdirSync(dirname(join(base, file)), { recursive: true });
       copyFileSync(join(repository, file), join(base, file));
     }
@@ -198,7 +209,7 @@ function inRelease(callback) {
     mkdirSync(bin);
     writeFileSync(join(bin, "gh"), gh);
     chmodSync(join(bin, "gh"), 0o755);
-    for (const file of [...Object.keys(VERSION_FILES), "README.md", "scripts/next-version.mjs"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE, "scripts/next-version.mjs"]) {
       mkdirSync(dirname(join(work, file)), { recursive: true });
       copyFileSync(join(repository, file), join(work, file));
     }
@@ -317,4 +328,24 @@ test("the guards in main refuse a stale, ahead or inconsistent release state", s
   const disagree = next();
   assert.equal(disagree.status, 1);
   assert.match(disagree.stderr, /version files disagree/);
+}));
+
+test("--apply writes today's UTC day, and refuses when the last tag is dated after it", skipOnWindows, () => inRelease(({ git, commit, next, current, work }) => {
+  commit("Fix a thing (#11)");
+  git("push", "-q", "origin", "master", "--tags");
+  const before = new Date().toISOString().slice(0, 10);
+  const applied = next("--level", "patch", "--apply");
+  const after = new Date().toISOString().slice(0, 10);
+  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  // Bracketed, so a run that crosses 00:00 UTC cannot fail.
+  assert.ok([`${before}\n`, `${after}\n`].includes(readFileSync(join(work, RELEASE_DATE_FILE), "utf8")));
+  // A tag whose commit is dated in 2099 stands for a wrong clock: the date cannot precede it.
+  git("checkout", "-q", "--", ".");
+  execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-q", "-m", "Late (#12)"], { cwd: work, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_COMMITTER_DATE: "2099-01-01T00:00:00Z" } });
+  git("tag", "-f", `mcp-preview-${current}`);
+  commit("Fix after the late tag (#13)");
+  git("push", "-q", "-f", "origin", "master", "--tags");
+  const refused = next("--level", "patch", "--apply");
+  assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+  assert.match(refused.stderr, /^next-version: release date \d{4}-\d{2}-\d{2} is earlier than the last release tag's day, 2099-01-01/m);
 }));

@@ -13,6 +13,7 @@
 //! flag Yes (lab, 12 Oct 2026, one voucher each).
 //! It reads nothing it does not report: Tally's reason for a status (a tax
 //! mismatch, a missing HSN/SAC) is on its screen only and no field carries it.
+use super::failure_code::{GstStatusCode, ReadCode};
 use super::*;
 use quick_xml::events::Event;
 use std::collections::BTreeMap;
@@ -503,13 +504,13 @@ pub(super) fn status_arguments(args: &Value) -> Result<StatusArguments<'_>, Tool
     let from = normalized_date(required_string(args, "from")?)?;
     let to = normalized_date(required_string(args, "to")?)?;
     let Some(days) = window_span_days(&from, &to) else {
-        return Err("invalid_date_range".to_string().into());
+        return Err(ReadCode::InvalidDateRange.into());
     };
     let type_name =
         read_profiles::GstStatusTypeName::parse(required_string(args, "voucher_type_name")?)
-            .ok_or_else(|| "gst_status_type_name_invalid".to_string())?;
+            .ok_or(GstStatusCode::TypeNameInvalid)?;
     if days > STATUS_MAX_WINDOW_DAYS {
-        return Err("gst_status_window_too_long".to_string().into());
+        return Err(GstStatusCode::WindowTooLong.into());
     }
     Ok(StatusArguments {
         guid,
@@ -535,8 +536,9 @@ impl Server {
                 ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone())
             })?;
         if vouchers > STATUS_MAX_VOUCHER_MARK {
-            return Err(ToolFailure::from("gst_status_book_too_large".to_string())
-                .with_prior_evidence(evidence));
+            return Err(
+                ToolFailure::from(GstStatusCode::BookTooLarge).with_prior_evidence(evidence)
+            );
         }
         Ok(StatusGate {
             company,
@@ -569,17 +571,17 @@ impl Server {
         // refused: a voucher outside either is never reported.
         for (row, _) in &rows {
             let day = bridge_tally_core::TallyDate::parse(row.date.as_str()).map_err(|_| {
-                ToolFailure::from("gst_status_read_voucher_unidentified".to_string())
+                ToolFailure::from(GstStatusCode::ReadVoucherUnidentified)
                     .with_prior_evidence(evidence.clone())
             })?;
             if day < arguments.from || day > arguments.to {
-                return Err(ToolFailure::from("window_not_honoured".to_string())
-                    .with_prior_evidence(evidence));
+                return Err(
+                    ToolFailure::from(ReadCode::WindowNotHonoured).with_prior_evidence(evidence)
+                );
             }
             if row.voucher_type != arguments.type_name.as_str() {
                 return Err(
-                    ToolFailure::from("gst_status_type_not_honoured".to_string())
-                        .with_prior_evidence(evidence),
+                    ToolFailure::from(GstStatusCode::TypeNotHonoured).with_prior_evidence(evidence)
                 );
             }
         }
@@ -617,7 +619,7 @@ impl Server {
             "complete"
         } else {
             evidence.state = "partial";
-            evidence.reason_code = Some("gst_status_voucher_unread".to_string());
+            evidence.reason_code = Some(GstStatusCode::VoucherUnread.as_str().to_string());
             "partial"
         };
         let mut result = json!({

@@ -36,7 +36,7 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.doesNotMatch(app, /function configuredTallyEndpoint/);
   assert.match(app, /if \(view !== "companies" && view !== "clients"\) return;/);
   assert.match(app, /<OutstandingsScreen\s+key=\{selectedCompany \|\| "unselected"\}/);
-  assert.match(app, /setOpenCompanyNames\(\[\]\);\s*setUntrustedDiscoveredCompanies\(\[\]\);/);
+  assert.match(app, /setOpenCompanies\(\[\]\);\s*setUntrustedDiscoveredCompanies\(\[\]\);/);
   assert.match(app, /correlation_key: company\.correlation_key/);
   assert.match(app, /onOpen=\{\(\) => void refreshPersistedCompanyProfiles\(\)\}/);
   assert.match(app, /import \{ usePersistedCompanyProfiles \} from "\.\/persisted-company-profiles";/);
@@ -70,7 +70,9 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.match(app, /const identityDiscriminator = clientIdentityDiscriminator\(company\);/);
   assert.match(app, /const summaryDiscriminator = clientIdentitySummaryDiscriminator\(company\);/);
   assert.match(app, /summaryDiscriminator,/);
-  assert.match(app, /searchText: `\$\{company\.name\} \$\{identityDiscriminator\}`/);
+  // #2462: a verified client is drawn and found by the name the backend shows.
+  assert.match(app, /name: company\.shown_name,\s*summaryDiscriminator,/);
+  assert.match(app, /searchText: `\$\{company\.shown_name\} \$\{identityDiscriminator\}`/);
   assert.match(app, /Company no\. \$\{company\.company_number \?\? "not observed"\}/);
   assert.match(app, /Books from \$\{booksFrom\}/);
   assert.match(app, /GUID \$\{company\.guid \?\? "not observed"\}/);

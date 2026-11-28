@@ -891,8 +891,9 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of a summary over a `vouchers` window (`agent_voucher_summary.rs`) that its
-    /// arguments or its rows end in.
+    /// Some refusals of a summary over a `vouchers` window (`agent_voucher_summary.rs`): an
+    /// argument or a row it cannot summarise. The composed group and cost-centre codes are
+    /// not here.
     pub(crate) enum VoucherSummaryCode {
         /// The `summarise_by` argument is not one of the groupings the summary admits.
         SummariseByInvalid = "summarise_by_invalid",
@@ -906,7 +907,8 @@ failure_codes! {
 failure_codes! {
     /// The refusals of the desktop's review of a selected Journal file
     /// (`agent_desktop_journal.rs`, `agent_desktop_journal_review.rs`): a file that cannot be
-    /// read, is too large, or is not an exact copy of a batch this installation saved.
+    /// read, is too large, or is not an exact copy of a batch this installation saved, and a file
+    /// picker that failed.
     pub(crate) enum DesktopJournalCode {
         /// The selected file is larger than the review reads.
         SelectedFileTooLarge = "import_selected_file_too_large",

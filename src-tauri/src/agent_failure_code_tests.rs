@@ -434,6 +434,34 @@ const VOUCHER_READ: &[(VoucherReadCode, &str)] = &[
         VoucherReadCode::AccountingStateNotObserved,
         "voucher_accounting_state_not_observed",
     ),
+    (
+        VoucherReadCode::IrnAckDateInvalid,
+        "voucher_irn_ack_date_invalid",
+    ),
+    (
+        VoucherReadCode::PartyNoteDateInvalid,
+        "voucher_party_note_date_invalid",
+    ),
+    (
+        VoucherReadCode::LadingDateInvalid,
+        "voucher_lading_date_invalid",
+    ),
+    (
+        VoucherReadCode::DeliveryNoteDateInvalid,
+        "voucher_delivery_note_date_invalid",
+    ),
+    (
+        VoucherReadCode::ChangeRowCoreFieldInvalid,
+        "change_row_core_field_invalid",
+    ),
+    (
+        VoucherReadCode::MasterIdInvalid,
+        "voucher_master_id_invalid",
+    ),
+    (
+        VoucherReadCode::ForeignCurrencyAmountUnparsed,
+        "foreign_currency_amount_unparsed",
+    ),
 ];
 
 const TOOL_REQUEST: &[(ToolRequestCode, &str)] = &[
@@ -1310,13 +1338,13 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
-        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11,
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
-        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11, 21,
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 21,
     ]
     .iter()
     .sum();

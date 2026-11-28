@@ -8,8 +8,9 @@
   `party_not_billwise`, a bill-wise party whose closing is empty as `party_bills_none_reported` and one with a
   closing figure as `party_bills_answer_missing`, never as "no bills"; only that exact empty answer, twice, is read
   so. The party is resolved
-  from the ledger catalogue as the other party details resolve it, and the book's own name is sent only if it is ASCII
-  letters, digits and single inner spaces; any other name is refused before anything is sent
+  from the ledger catalogue as the other party details resolve it, and the book's own name is sent only in a shape
+  the lab has read through this report (ASCII letters, digits and single inner spaces, and the marks, word and
+  Devanagari word of the #2480 entry, in their read places); any other name is refused before anything is sent
   (`party_name_not_admitted`). The company's marks are read before and after, and must be unchanged. Measured with
   curl on TallyPrime 7.2 on two synthetic books: a receivable party at two dates, parties with one bill each, and
   `BRIDGE Supplier RJ` on `BRIDGE PILOT LAB` at 31 July 2026 answering empty, its ledger bill-wise with an empty

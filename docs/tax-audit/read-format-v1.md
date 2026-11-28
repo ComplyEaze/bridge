@@ -59,7 +59,7 @@ names the read passes both, and the producer refuses the call if the manifest ha
 | Field | Meaning |
 |---|---|
 | `format` | always `"tally-read"` |
-| `format_version` | `"MAJOR.MINOR"`, `"1.0"` or `"1.1"` (section 8) |
+| `format_version` | `"MAJOR.MINOR"`, `"1.0"`, `"1.1"` or `"1.2"` (section 8) |
 | `read_id` | producer-assigned, unique |
 | `created_at` | when the manifest was written (ISO 8601 with offset) |
 | `read_at` | when the read represents the books. Book.read_at comes from here, and post-dated status is relative to it |
@@ -87,6 +87,7 @@ names the read passes both, and the producer refuses the call if the manifest ha
 | `requested_at`, `elapsed_ms`, `tally_status` | per request |
 | `rows`, `alter_id_max` | required for `vouchers`. `rows` counts the `VOUCHER` elements that carry a `REMOTEID` attribute or a `GUID` child; a template row has neither. `alter_id_max` is the largest `ALTERID` among them, or null |
 | `scope {from,to,exhaustive}` | required for `voucher_status_list` |
+| `bill_allocations` | 1.2, optional, `vouchers` parts only: `true` when the part's request asked for each ledger entry's bill allocations. Absent or `false` says nothing about them (section 8.2) |
 | `derived_from` | the part ids a derived part came from |
 
 ## 4. Consistency: the high-water bracket
@@ -137,7 +138,7 @@ read may exceed it.
 | `ledgers` | 1 (required) | request with SVFROMDATE = period start | LEDGER@NAME, PARENT, OPENINGBALANCE, PARTYGSTIN, GST registration history, INCOMETAXNUMBER, ISBILLWISEON |
 | `trial_balance` | 1 (required) | = period | LEDGER@NAME, TBALOPENING, TBALCLOSING, DEBITTOTALS, CREDITTOTALS |
 | `voucher_types` | ≤1 | – | VOUCHERTYPE@NAME, PARENT (base-type resolution) |
-| `vouchers` | ≥1 (required); windows contiguous over the period | per part | VOUCHER (GUID or @REMOTEID), DATE, VOUCHERTYPENAME/@VCHTYPE, VOUCHERNUMBER, REFERENCE, PARTYLEDGERNAME, PARTYGSTIN, NARRATION, MASTERID, ALTERID, ISCANCELLED, ISOPTIONAL, ISPOSTDATED; ledger and inventory entry lists |
+| `vouchers` | ≥1 (required); windows contiguous over the period | per part | VOUCHER (GUID or @REMOTEID), DATE, VOUCHERTYPENAME/@VCHTYPE, VOUCHERNUMBER, REFERENCE, PARTYLEDGERNAME, PARTYGSTIN, NARRATION, MASTERID, ALTERID, ISCANCELLED, ISOPTIONAL, ISPOSTDATED; ledger and inventory entry lists; with `bill_allocations` (1.2), each ledger entry's BILLALLOCATIONS.LIST: NAME, BILLTYPE, AMOUNT |
 | `stock_items` | ≤1 | – | STOCKITEM@NAME, GUID, PARENT, BASEUNITS, OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE |
 | `stock_summary` | 0..n, distinct `as_of` | `as_of` | STOCKITEM@NAME, GUID, CLOSINGBALANCE, CLOSINGVALUE, CLOSINGRATE |
 | `report_profit_and_loss` | ≤1 | = period | Tally's own report line items |
@@ -258,6 +259,37 @@ rules above cover what that cannot: a read captured while only one of the pair w
   manifest records `books_from`, the second refuses a split's read for its parent's year with no
   pin. Without a pin, the reverse case (the parent's read for a year after the split) is admitted,
   and so is any read whose manifest records no `books_from`; only the pin separates those.
+
+### 8.2 Changes in 1.2
+
+1.2 adds one optional field, `bill_allocations` on a `vouchers` part, so that a read can carry
+each voucher's bill allocations and a consumer can tell a read that did not ask for them from
+vouchers that have none. It is purely additive: a 1.0 or 1.1 read is read as before, and a reader
+that does not know the field ignores it.
+
+- A producer sets it `true` only when the part's request asked for the allocations: the entry
+  wildcard `ALLLEDGERENTRIES.*`, or a named fetch that names them. Which request shape carries
+  every allocation is recorded in `docs/tally/TALLY_PROTOCOL_REFERENCE.md` §8.2a.
+- A consumer reads allocations only when every `vouchers` part of the read sets it `true`. When
+  any part does not, nothing is known of any voucher's bills, and the consumer says so rather
+  than reading none.
+- Each row of an entry's BILLALLOCATIONS.LIST is read to a bill type (New Ref, Agst Ref, Advance
+  or On Account), the bill it names, and AMOUNT in paise, debit positive. A row with no
+  BILLTYPE, NAME or AMOUNT is Tally's empty placeholder and is passed over. A row with no
+  BILLTYPE that carries a name or an amount is not read, because a narrower request can drop the
+  type (§8.2a), and neither is a row of another type, a New Ref, Agst Ref or Advance row with no
+  name, an On Account row with a name, or a typed row whose amount is absent or not a plain
+  decimal.
+- A row that is not read does not refuse the read. `bridge-tax-audit` then holds the read's
+  allocations as unreadable, with the part, voucher and ledger of the first such row, and every
+  other part of the book is read as before.
+- A `bill_allocations` that is not `true` or `false`, or one on a part of another kind, refuses
+  the read (`C1-schema`). That is the one new refusal, and only a read that sets the field can
+  meet it; otherwise admission stays what the reference implementation admits, which reads no
+  allocations.
+- **Unverified:** whether an entry-wildcard read of a real book carries untyped rows with an
+  amount. The one capture read so far, of a synthetic lab company on TallyPrime 7.1, holds none.
+  If real books do, their allocations read as unreadable until a rule for those rows is measured.
 
 ## 9. Real-world validation
 

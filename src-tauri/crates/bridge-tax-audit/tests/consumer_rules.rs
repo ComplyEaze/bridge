@@ -266,7 +266,7 @@ fn c5_a_pin_the_manifest_cannot_check_is_refused() {
 fn pinned_engagement(
     guid: &str,
     books_from: &str,
-) -> bridge_tax_audit::Result<bridge_tax_audit::Engagement> {
+) -> bridge_tax_audit::Result<bridge_tax_audit::DirectoryEngagement> {
     let text = std::fs::read_to_string(common::fixtures().join("synthetic-engagement.toml"))
         .unwrap()
         .replace(
@@ -283,7 +283,7 @@ fn pinned_engagement(
 #[test]
 fn c5_a_valid_pin_survives_the_config_parse() {
     let e = pinned_engagement(&FIXTURE_GUID.to_uppercase(), "2025-04-01").unwrap();
-    let pin = e.company_pin.expect("pin parsed");
+    let pin = e.company_pin.clone().expect("pin parsed");
     assert_eq!(pin.guid, FIXTURE_GUID);
     assert_eq!(pin.books_from.as_str(), "20250401");
 }

@@ -1,6 +1,5 @@
 //! The verdict on one stock-item read-back (#1381): a pure judge over what one
-//! call holds, by the table the #1381 decision set (decision comment
-//! 7203323798), first match wins:
+//! call holds, by the table the #1381 decision set, first match wins:
 //!
 //! 1. The read-back failed in transport or parse, or its two marks answers
 //!    (binding and aim) give the batch company different marks:
@@ -177,7 +176,7 @@ impl StockReadBack {
         };
         // E: an earlier item changed, or missing from the fresh read.
         let read: BTreeMap<String, u64> = (catalogue.items().iter())
-            .map(|item| (item.guid.to_ascii_lowercase(), item.alter_id))
+            .map(|item| (item.guid().to_ascii_lowercase(), item.alter_id()))
             .collect();
         for (guid, alter_id) in basis.pre_image() {
             let cause = match read.get(guid) {

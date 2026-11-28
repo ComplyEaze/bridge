@@ -16,6 +16,7 @@
 //! on any Tally release/mode:
 //! every value this tool returns is exploratory, not a qualified claim.
 
+use super::failure_code::{CompanyReadCode, ReadCode};
 use super::*;
 use bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
@@ -511,7 +512,7 @@ pub(super) fn render_lab_master_collection(
     period: &NativeLedgerExportPeriod,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     let object_type = kind.tally_type();
     let name = format!("Bridge Lab {object_type}s");
     let static_variables = company.xml_static_variables(
@@ -620,17 +621,19 @@ fn parse_lab_master_rows(
                 let at_collection = path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"];
                 if at_collection {
                     if tag != row_tag {
-                        return Err("agent_read_protocol_invalid".to_string());
+                        return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                     }
                     attribute_name = None;
                     for attribute in event.attributes() {
-                        let attribute =
-                            attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
+                        let attribute = attribute
+                            .map_err(|_| ReadCode::ReadProtocolInvalid.as_str().to_string())?;
                         if attribute.key.as_ref().eq_ignore_ascii_case("NAME") {
                             attribute_name = Some(
                                 attribute
                                     .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                                    .map_err(|_| "agent_read_protocol_invalid".to_string())?
+                                    .map_err(|_| {
+                                        ReadCode::ReadProtocolInvalid.as_str().to_string()
+                                    })?
                                     .into_owned(),
                             );
                         }
@@ -691,12 +694,12 @@ fn parse_lab_master_rows(
                     }
                 }
                 if path.pop().as_deref() != Some(end.as_str()) {
-                    return Err("agent_read_protocol_invalid".to_string());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                 }
             }
             Ok(quick_xml::events::Event::Eof) => break,
             Ok(_) => {}
-            Err(_) => return Err("agent_read_protocol_invalid".to_string()),
+            Err(_) => return Err(ReadCode::ReadProtocolInvalid.as_str().to_string()),
         }
     }
     Ok(rows)
@@ -804,7 +807,7 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
                 // `path` is the parent chain of the element about to open.
                 if path_is(&path, &COLLECTION_PREFIX) {
                     if tag != "VOUCHER" {
-                        return Err("agent_read_protocol_invalid".to_string());
+                        return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                     }
                     voucher = Some(BTreeMap::new());
                     entries.clear();
@@ -905,12 +908,12 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
                     }
                 }
                 if path.pop().as_deref() != Some(end.as_str()) {
-                    return Err("agent_read_protocol_invalid".to_string());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                 }
             }
             Ok(quick_xml::events::Event::Eof) => break,
             Ok(_) => {}
-            Err(_) => return Err("agent_read_protocol_invalid".to_string()),
+            Err(_) => return Err(ReadCode::ReadProtocolInvalid.as_str().to_string()),
         }
     }
     Ok(rows)
@@ -930,7 +933,7 @@ pub(super) async fn lab_read_inventory(
     };
     let (from, to) = (date("from")?, date("to")?);
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     // Always-on lab preconditions (feature+env; §3.1). This is a read, so it
     // reads whichever company_guid the caller asks for -- it does not require
@@ -970,7 +973,7 @@ pub(super) async fn lab_read_inventory(
         let rows = parse_lab_inventory_vouchers(&voucher_xml)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if !window_honoured(&rows, from.as_str(), to.as_str()) {
-            return Err(ToolFailure::from("window_not_honoured".to_string())
+            return Err(ToolFailure::from(super::failure_code::ReadCode::WindowNotHonoured)
                 .with_prior_evidence(evidence.clone()));
         }
         let offset = arg_usize(args, "offset", 0)?;
@@ -1119,7 +1122,7 @@ pub(super) async fn lab_read_purchase_identity(
     };
     let (from, to) = (date("from")?, date("to")?);
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     if !identity_window_fits(&from, &to) {
         return Err("lab_identity_window_too_wide".to_string().into());
@@ -1146,7 +1149,7 @@ pub(super) async fn lab_read_purchase_identity(
             let parsed = parse_agent_rows(&xml, identity.company_guid());
             if let Ok(rows) = &parsed {
                 if !window_honoured(rows, from.as_str(), to.as_str()) {
-                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                    return Err(ToolFailure::from(super::failure_code::ReadCode::WindowNotHonoured)
                         .with_prior_evidence(evidence.clone()));
                 }
             }
@@ -1275,7 +1278,7 @@ pub(super) fn render_lab_voucher_key_probe(
     key: &ProbeKey,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     let (day, method, key) = (day.as_str(), term.method(), key.as_str());
     let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",

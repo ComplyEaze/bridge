@@ -5,8 +5,8 @@
 
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, parse_ledger_census_slice,
-    parse_stock_group_census_slice, parse_stock_item_census_slice, ExpectedTallyTextEncoding,
-    StandardLedgerCatalogError,
+    parse_stock_group_census_slice, parse_stock_item_census_slice,
+    xml_read_profiles::ValidatedCompanyName, ExpectedTallyTextEncoding, StandardLedgerCatalogError,
 };
 
 const COMPANY_GUID: &str = "f8dab51e-a5d9-49d5-9232-54a16c8b95bb";
@@ -376,7 +376,10 @@ fn the_captured_census_requests_are_the_builders_bytes() {
     .unwrap();
     assert_eq!(
         bridge_tally_protocol::encode_tally_xml_request_utf16le(
-            &render_stock_item_census_slice_request("BRIDGE STOCK LAB", &items.slices()[2])
+            &render_stock_item_census_slice_request(
+                &ValidatedCompanyName::new("BRIDGE STOCK LAB").unwrap(),
+                &items.slices()[2],
+            )
         ),
         stock_lab_bytes("stock_item_census_slice_stock_lab_200_300_request")
     );
@@ -390,7 +393,10 @@ fn the_captured_census_requests_are_the_builders_bytes() {
     .unwrap();
     assert_eq!(
         bridge_tally_protocol::encode_tally_xml_request_utf16le(
-            &render_stock_group_census_slice_request("BRIDGE STOCK LAB", &groups.slices()[0])
+            &render_stock_group_census_slice_request(
+                &ValidatedCompanyName::new("BRIDGE STOCK LAB").unwrap(),
+                &groups.slices()[0],
+            )
         ),
         stock_lab_bytes("stock_group_census_slice_stock_lab_0_300_request")
     );

@@ -152,7 +152,7 @@ fn bound_element(company: &str) -> String {
 fn every_request_is_byte_equal_to_its_committed_fixture() {
     for kind in NativeMasterKind::ALL {
         assert_eq!(
-            render_native_masters_request(kind, LAB),
+            render_native_masters_request(kind, &ValidatedCompanyName::new(LAB).unwrap()),
             request_fixture(kind),
             "{kind:?}"
         );
@@ -169,7 +169,10 @@ fn the_voucher_type_request_is_the_existing_builder_with_the_masters_fields() {
     );
     assert_ne!(derived, existing, "the derivation must change something");
     assert_eq!(
-        render_native_masters_request(NativeMasterKind::VoucherTypes, LAB),
+        render_native_masters_request(
+            NativeMasterKind::VoucherTypes,
+            &ValidatedCompanyName::new(LAB).unwrap(),
+        ),
         derived
     );
 }

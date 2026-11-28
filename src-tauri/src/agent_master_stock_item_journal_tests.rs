@@ -97,7 +97,7 @@ fn pre_image_of(read: &StockItemCatalogue) -> PreImage {
     PreImage::new(
         read.items()
             .iter()
-            .map(|item| (item.guid.clone(), item.alter_id)),
+            .map(|item| (item.guid().to_owned(), item.alter_id())),
     )
     .unwrap()
 }
@@ -682,9 +682,9 @@ mod judge {
     type Answers<'a> = (Marks<'a>, Marks<'a>);
 
     /// Another loaded company's GUID: synthetic.
-    const OTHER: &str = "0f0e0d0c-0b0a-4909-8807-060504030201";
+    const OTHER: &str = "00f0c618-b0df-43bd-bd69-b4c7b92c616f";
     /// A third loaded company's GUID: synthetic.
-    const THIRD: &str = "1a2b3c4d-5e6f-4a0b-9c1d-2e3f4a5b6c7d";
+    const THIRD: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
 
     fn marks(pairs: &[(&str, u64)]) -> Vec<MasterMark> {
         (pairs.iter())
@@ -838,7 +838,7 @@ mod judge {
         let extra = format!("{COMPANY_GUID}-000000ff");
         let before = catalogue(BEFORE);
         let rows = (before.items().iter())
-            .map(|item| (item.guid.clone(), item.alter_id))
+            .map(|item| (item.guid().to_string(), item.alter_id()))
             .chain([(extra, 1)]);
         let intent = intent_with(dir, &batch, &PreImage::new(rows).unwrap());
         let _recorded = append_kind_intent::<StockItemBatch>(dir, &lock(), intent).unwrap();

@@ -144,12 +144,12 @@ impl Server {
                     .company_number
                     .clone()
                     .filter(|value| !value.is_empty())
-                    .ok_or_else(|| "company_identity_incomplete".to_string())?;
+                    .ok_or(super::failure_code::ReadCode::CompanyIdentityIncomplete)?;
                 let books_from = company
                     .books_from
                     .clone()
                     .filter(|value| !value.is_empty())
-                    .ok_or_else(|| "company_identity_incomplete".to_string())?;
+                    .ok_or(super::failure_code::ReadCode::CompanyIdentityIncomplete)?;
                 let identity = VerifiedCompanyIdentity::from_observed_companies(
                     company.name.clone(),
                     observed_guid,

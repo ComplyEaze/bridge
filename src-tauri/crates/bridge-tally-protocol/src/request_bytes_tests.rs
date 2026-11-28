@@ -27,7 +27,6 @@ use crate::ledger_census::{
     StockGroups, StockItems,
 };
 use crate::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
-use crate::ledger_scope::LedgerScopeName;
 use crate::native_cash_flow::{render_native_cash_flow_request, WholeMonthWindow};
 use crate::native_company_features::render_company_features_request;
 use crate::native_funds_flow::render_native_funds_flow_request;
@@ -52,8 +51,8 @@ use crate::native_outstandings::{
     render_party_ledger_master_request_for_parents_with_gst_details,
     render_party_ledger_master_request_for_parents_with_mailing_details,
     render_party_ledger_master_request_with_gst_details,
-    render_party_ledger_master_request_with_mailing_details, NativeBillsReportKind,
-    NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
+    render_party_ledger_master_request_with_mailing_details, LedgerOutstandingsParty,
+    NativeBillsReportKind, NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
 };
 use crate::native_statement_reports::{
     render_built_in_report_request, render_exploded_stock_summary_request,
@@ -508,7 +507,7 @@ fn built_requests() -> Vec<(String, String)> {
         .expect("a twelve-month window");
     let parents = parent_part();
     let ledgers = ledger_part();
-    let party = LedgerScopeName::new("Lab Party P1").expect("an admitted ledger name");
+    let party = LedgerOutstandingsParty::new("Lab Party P1").expect("an admitted ledger name");
     let item = MeasuredItemName::new("Kit & Co Item").expect("an admitted item name");
     let guid = company_guid();
 
@@ -537,7 +536,7 @@ fn built_requests() -> Vec<(String, String)> {
     ) {
         row(
             format!("render_native_masters_request/{kind:?}"),
-            render_native_masters_request(kind, COMPANY),
+            render_native_masters_request(kind, &company),
         );
     }
     // #1381's candidate read, not yet sent by any release.
@@ -548,11 +547,11 @@ fn built_requests() -> Vec<(String, String)> {
     // The same request as the `ReadOnlyProfile::CompanyBookExtentV2` row.
     row(
         "render_company_book_extent_v2".into(),
-        render_company_book_extent_v2(COMPANY),
+        render_company_book_extent_v2(&company),
     );
     row(
         "render_company_ledger_count_request".into(),
-        render_company_ledger_count_request(COMPANY),
+        render_company_ledger_count_request(&company),
     );
 
     let profile_ids = every!(ReadOnlyProfileId:
@@ -624,7 +623,7 @@ fn built_requests() -> Vec<(String, String)> {
 
     row(
         "render_company_inventory_flags_request".into(),
-        render_company_inventory_flags_request(COMPANY, &guid),
+        render_company_inventory_flags_request(&company, &guid),
     );
     row(
         "render_native_stock_summary_request".into(),
@@ -632,27 +631,27 @@ fn built_requests() -> Vec<(String, String)> {
     );
     row(
         "render_company_features_request".into(),
-        render_company_features_request(COMPANY, &guid),
+        render_company_features_request(&company, &guid),
     );
     row(
         "render_ledger_outstandings_request".into(),
-        render_ledger_outstandings_request(COMPANY, &party, &to),
+        render_ledger_outstandings_request(&company, &party, &to),
     );
 
     let ledger_plan = LedgerCensusPlan::new(25, CENSUS_LIMITS).expect("a census plan");
     row(
         "render_ledger_census_slice_request/(10,20]".into(),
-        render_ledger_census_slice_request(COMPANY, &ledger_plan.slices()[1]),
+        render_ledger_census_slice_request(&company, &ledger_plan.slices()[1]),
     );
     let item_plan = CensusPlan::<StockItems>::new(25, CENSUS_LIMITS).expect("a census plan");
     row(
         "render_stock_item_census_slice_request/(10,20]".into(),
-        render_stock_item_census_slice_request(COMPANY, &item_plan.slices()[1]),
+        render_stock_item_census_slice_request(&company, &item_plan.slices()[1]),
     );
     let group_plan = CensusPlan::<StockGroups>::new(25, CENSUS_LIMITS).expect("a census plan");
     row(
         "render_stock_group_census_slice_request/(10,20]".into(),
-        render_stock_group_census_slice_request(COMPANY, &group_plan.slices()[1]),
+        render_stock_group_census_slice_request(&company, &group_plan.slices()[1]),
     );
 
     for kind in every!(NativeStatementKind: BalanceSheet, ProfitAndLoss) {

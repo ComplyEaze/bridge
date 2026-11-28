@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml
+# parser: parse_native_ledger_source_records_with_evidence(FOREXGROUP)
+# source: captured
+Err(native ledger row carried a foreign-currency opening balance)

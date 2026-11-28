@@ -32,6 +32,7 @@
 //! whether the answer is on file. The call that got Tally's answer never says
 //! the create may have been sent; a later call that finds an intent and no
 //! recorded answer cannot know Tally answered, and says so.
+use super::super::failure_code::MasterLedgerCode;
 use super::approval::{ApprovalBinding, HeldRequest};
 use super::master_ledger::{
     append, append_intent, read_journal, remove_pre_image, write_pre_image, BatchState,
@@ -175,11 +176,11 @@ fn parse_ledger_item(ledger: &Value) -> Result<LedgerCreateItem, String> {
     let (side, gstin, duty_head) = (text("side")?, text("gstin")?, text("duty_head")?);
     let kind = match kind {
         "party" | "suspense" | "gst_duty" => kind,
-        _ => return Err("master_kind_not_admitted".into()),
+        _ => return Err(MasterLedgerCode::KindNotAdmitted.as_str().into()),
     };
     let name = MasterName::new(text("name")?.ok_or_else(invalid)?)
         .map_err(|error| master_name_code(error).to_string())?;
-    let not_for_kind = || "ledger_field_not_for_kind".to_string();
+    let not_for_kind = || MasterLedgerCode::FieldNotForKind.as_str().to_string();
     let kind = match kind {
         "party" => {
             if duty_head.is_some() {
@@ -188,8 +189,8 @@ fn parse_ledger_item(ledger: &Value) -> Result<LedgerCreateItem, String> {
             let side = match side {
                 Some("sundry_debtors") => PartySide::SundryDebtors,
                 Some("sundry_creditors") => PartySide::SundryCreditors,
-                Some(_) => return Err("party_side_invalid".into()),
-                None => return Err("party_side_required".into()),
+                Some(_) => return Err(MasterLedgerCode::PartySideInvalid.as_str().into()),
+                None => return Err(MasterLedgerCode::PartySideRequired.as_str().into()),
             };
             let gstin = gstin
                 .map(VerifiedGstin::new)
@@ -211,14 +212,22 @@ fn parse_ledger_item(ledger: &Value) -> Result<LedgerCreateItem, String> {
             if side.is_some() || gstin.is_some() || bill_wise.is_some() {
                 return Err(not_for_kind());
             }
-            let spelled = duty_head.ok_or_else(|| "gst_duty_head_required".to_string())?;
+            let spelled = duty_head
+                .ok_or_else(|| MasterLedgerCode::GstDutyHeadRequired.as_str().to_string())?;
             let head = GstDutyHead::ALL
                 .into_iter()
                 .find(|head| head.tally_spelling() == spelled)
-                .ok_or_else(|| "gst_duty_head_not_admitted".to_string())?;
+                .ok_or_else(|| {
+                    MasterLedgerCode::GstDutyHeadNotAdmitted
+                        .as_str()
+                        .to_string()
+                })?;
             AdmittedLedgerKind::GstDuty {
-                head: AdmittedDutyHead::new(head)
-                    .map_err(|_| "gst_duty_head_not_admitted".to_string())?,
+                head: AdmittedDutyHead::new(head).map_err(|_| {
+                    MasterLedgerCode::GstDutyHeadNotAdmitted
+                        .as_str()
+                        .to_string()
+                })?,
             }
         }
     };
@@ -247,7 +256,7 @@ fn parse_ledger_creates(args: &Value) -> Result<LedgerCreateBatch, String> {
             .iter()
             .map(parse_ledger_item)
             .collect::<Result<Vec<_>, _>>()?,
-        (None, None) => return Err("ledger_required".into()),
+        (None, None) => return Err(MasterLedgerCode::LedgerRequired.as_str().into()),
         _ => return Err("argument_invalid:ledgers".into()),
     };
     LedgerCreateBatch::new(items).map_err(|error| batch_code(error).to_string())
@@ -298,7 +307,7 @@ fn creates_from_batch(batch: &MasterBatch) -> Result<LedgerCreateBatch, String> 
     LedgerCreateBatch::new(items).map_err(|error| {
         match error {
             LedgerCreateBatchError::TooMany => batch_code(error),
-            _ => "master_batch_invalid",
+            _ => MasterLedgerCode::BatchInvalid.as_str(),
         }
         .to_string()
     })
@@ -306,7 +315,7 @@ fn creates_from_batch(batch: &MasterBatch) -> Result<LedgerCreateBatch, String> 
 
 /// One stored item, parsed as a caller's input is.
 fn item_from_stored(stored: &StoredLedgerCreate) -> Result<LedgerCreateItem, String> {
-    let refused = || "master_batch_invalid".to_string();
+    let refused = || MasterLedgerCode::BatchInvalid.as_str().to_string();
     let name = MasterName::new(&stored.name).map_err(|_| refused())?;
     let party = |side| -> Result<AdmittedLedgerKind, String> {
         Ok(AdmittedLedgerKind::Party {
@@ -725,7 +734,7 @@ impl Server {
             let state = journal
                 .state(batch_id)
                 .cloned()
-                .ok_or_else(|| "master_batch_not_found".to_string())?;
+                .ok_or_else(|| MasterLedgerCode::BatchNotFound.as_str().to_string())?;
             Ok(state)
         })();
         let state = admitted?;
@@ -936,7 +945,7 @@ impl Server {
                         )
                         .await
                     }
-                    None => Err("master_batch_not_found".to_string()),
+                    None => Err(MasterLedgerCode::BatchNotFound.as_str().to_string()),
                 },
                 Err(code) => Err(code.clone()),
             };

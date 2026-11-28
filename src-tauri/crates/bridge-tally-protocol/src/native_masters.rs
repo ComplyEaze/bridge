@@ -24,7 +24,6 @@ use crate::native_ledger_guid_has_company_prefix;
 use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::stock_tax_details::StockTaxLists;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
-use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use crate::xml_read_profiles::ValidatedCompanyName;
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
@@ -254,14 +253,17 @@ fn render_masters_collection(
 
 /// Renders the collection request for one kind of master, binding the
 /// response to its company by the computed `BRIDGECOMPANYGUID`.
-pub fn render_native_masters_request(kind: NativeMasterKind, company: &str) -> String {
+pub fn render_native_masters_request(
+    kind: NativeMasterKind,
+    company: &ValidatedCompanyName,
+) -> String {
     let (collection, is_modify, master_type, fetch) = kind.request_shape();
     render_masters_collection(
         collection,
         is_modify,
         master_type,
         fetch,
-        &static_variables_for_unvalidated_company(company, MASTERS_EXPORT_FORMAT, ""),
+        &company.xml_static_variables(MASTERS_EXPORT_FORMAT, ""),
     )
 }
 

@@ -2708,7 +2708,7 @@ impl TallyClient {
             .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
         let mut census = LedgerCensus::new(plan);
         while let Some(slice) = census.next_slice() {
-            let request = render_ledger_census_slice_request(identity.display_name(), &slice);
+            let request = render_ledger_census_slice_request(identity.company_name(), &slice);
             let (body, bytes, sha256) = self
                 .post_xml_with_encoded_bytes(request.clone())
                 .await
@@ -2772,7 +2772,7 @@ impl TallyClient {
         evidence: &mut RuntimeReadEvidence,
         count_evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<CountCrossCheck> {
-        let request = render_company_ledger_count_request(identity.display_name());
+        let request = render_company_ledger_count_request(identity.company_name());
         let (body, bytes, sha256) = self
             .post_xml_with_encoded_bytes(request.clone())
             .await

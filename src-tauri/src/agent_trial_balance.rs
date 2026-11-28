@@ -27,7 +27,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         let period = crate::tally::runtime::TrialBalancePeriod::new(from.clone(), to.clone())
-            .map_err(|_| "invalid_date_range".to_string())?;
+            .map_err(|_| super::failure_code::ReadCode::InvalidDateRange)?;
         let (company, identity, mut prior) = self.verified_company(guid).await?;
         let offset = arg_usize(args, "offset", 0)?;
         let limit =

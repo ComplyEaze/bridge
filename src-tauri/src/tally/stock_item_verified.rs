@@ -163,10 +163,10 @@ impl ReadBackVerdict {
         let holding: Vec<_> = fresh
             .items()
             .iter()
-            .filter(|item| item.name == name || item.names.iter().any(|entry| entry == name))
+            .filter(|item| item.name() == name || item.names().iter().any(|entry| entry == name))
             .collect();
         let item = match holding.as_slice() {
-            [item] if item.name == name => *item,
+            [item] if item.name() == name => *item,
             _ => {
                 return Self::NotFoundOnce {
                     rows: holding.len(),
@@ -174,7 +174,7 @@ impl ReadBackVerdict {
             }
         };
 
-        if before.contains(&item.guid) {
+        if before.contains(item.guid()) {
             return Self::NotNew;
         }
 
@@ -227,7 +227,7 @@ impl ReadBackVerdict {
 
         if fields.is_empty() {
             Self::Equal(EqualRead {
-                guid: item.guid.clone(),
+                guid: item.guid().to_owned(),
             })
         } else {
             Self::Differs { fields }

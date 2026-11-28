@@ -692,7 +692,7 @@ pub(super) fn native_group_snapshot_read(company: &ValidatedCompanyName) -> Read
 
 /// The voucher types of the book, every field, for an invoice build: the named
 /// type, its parent chain to a reserved class and its series-level numbering.
-pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
+pub(super) fn invoice_voucher_types_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
@@ -700,7 +700,7 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
 /// year), with the measured per-row compute of the invoice's class, for the
 /// duplicate-number check: the program compares the numbers (#2162 item 11).
 pub(super) fn invoice_window_numbers_read(
-    company: &str,
+    company: &ValidatedCompanyName,
     class: agent_import::InvoiceClass,
     window: (&TallyDate, &TallyDate),
 ) -> ReadRequest {
@@ -711,7 +711,7 @@ pub(super) fn invoice_window_numbers_read(
 
 /// A posted invoice read back by type and number, every field the build wrote.
 pub(super) fn invoice_readback_read(
-    company: &str,
+    company: &ValidatedCompanyName,
     type_guid: &agent_import::invoice::VoucherTypeGuid,
     number: &agent_import::invoice::InvoiceNumber,
     window: (&TallyDate, &TallyDate),
@@ -745,7 +745,7 @@ pub(super) fn invoice_e_invoice_read(
 /// (#1331). Its window is the invoice's financial year start and the invoice
 /// date.
 pub(super) fn invoice_ledger_rates_scoped_read(
-    company: &str,
+    company: &ValidatedCompanyName,
     window: (&TallyDate, &TallyDate),
     part: &bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
 ) -> ReadRequest {
@@ -756,13 +756,13 @@ pub(super) fn invoice_ledger_rates_scoped_read(
 
 /// The group listing with each group's HSN/SAC rows, for the HSN/SAC check
 /// of an invoice (rows bound to the company by GUID).
-pub(super) fn invoice_group_hsn_read(company: &str) -> ReadRequest {
+pub(super) fn invoice_group_hsn_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_group_hsn_request(company))
 }
 
 /// The company's GST registrations, for an invoice build (rows bound to the
 /// company by GUID).
-pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {
+pub(super) fn invoice_company_registration_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_company_registration_request(
         company,
     ))

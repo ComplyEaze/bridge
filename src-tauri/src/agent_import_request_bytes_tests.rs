@@ -29,6 +29,7 @@ use std::collections::BTreeSet;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 
 use super::cancel::{render_native_cancel_xml, RemoteId};
 use super::invoice::{
@@ -454,14 +455,15 @@ fn built_requests() -> Vec<(String, String)> {
         ["abc-b", "abc-a"].map(|guid| LedgerGuid::parse(guid).expect("a ledger GUID")),
     )
     .expect("a ledger part");
+    let company = ValidatedCompanyName::new(COMPANY).expect("the table's company name is valid");
     row(
         "render_voucher_types_request",
-        Ok(render_voucher_types_request(COMPANY)),
+        Ok(render_voucher_types_request(&company)),
     );
     row(
         "render_invoice_number_request",
         Ok(render_invoice_number_request(
-            COMPANY,
+            &company,
             &number,
             (&from, &to),
         )),
@@ -473,7 +475,7 @@ fn built_requests() -> Vec<(String, String)> {
         row(
             &format!("render_invoice_window_numbers_request/{name}"),
             Ok(render_invoice_window_numbers_request(
-                COMPANY,
+                &company,
                 class,
                 (&from, &to),
             )),
@@ -482,7 +484,7 @@ fn built_requests() -> Vec<(String, String)> {
     row(
         "render_invoice_readback_request",
         Ok(render_invoice_readback_request(
-            COMPANY,
+            &company,
             &type_guid,
             &number,
             (&from, &to),
@@ -490,19 +492,19 @@ fn built_requests() -> Vec<(String, String)> {
     );
     row(
         "render_company_registration_request",
-        Ok(render_company_registration_request(COMPANY)),
+        Ok(render_company_registration_request(&company)),
     );
     row(
         "render_ledger_rates_request_for_ledgers",
         Ok(render_ledger_rates_request_for_ledgers(
-            COMPANY,
+            &company,
             (&from, &to),
             &ledgers,
         )),
     );
     row(
         "render_group_hsn_request",
-        Ok(render_group_hsn_request(COMPANY)),
+        Ok(render_group_hsn_request(&company)),
     );
 
     // Import builders. Their REMOTEIDs and batch id are the sentinel UUIDs of

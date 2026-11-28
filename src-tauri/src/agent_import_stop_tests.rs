@@ -899,7 +899,7 @@ fn the_build_asks_the_stop_under_its_lock_before_it_writes_a_file() {
         .rfind("voucher.voucher_type.invoice_class().is_some()")
         .expect("and only for an invoice batch");
     let refused = build
-        .find("\"invoice_company_stopped\"")
+        .find("ImportBuildCode::InvoiceCompanyStopped")
         .expect("and refuses it by its own code");
     let lineage = build
         .find("let lineage = match payload.amends_batch_id")

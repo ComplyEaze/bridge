@@ -120,7 +120,11 @@ fn scope_of(
 }
 
 fn rendered(scope: &InvoiceLedgerScope) -> String {
-    wire::render_ledger_rates_request_for_ledgers(PILOT, (&window().0, &window().1), scope.part())
+    wire::render_ledger_rates_request_for_ledgers(
+        &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(PILOT).unwrap(),
+        (&window().0, &window().1),
+        scope.part(),
+    )
 }
 
 // ---- The pilot lab's own bytes ----

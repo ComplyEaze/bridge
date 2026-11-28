@@ -383,6 +383,80 @@ const VOUCHER_READ: &[(VoucherReadCode, &str)] = &[
     ),
 ];
 
+const TOOL_REQUEST: &[(ToolRequestCode, &str)] = &[
+    (ToolRequestCode::RequestCancelled, "request_cancelled"),
+    (ToolRequestCode::HostSettingInvalid, "host_setting_invalid"),
+];
+
+const IMPORT_POST: &[(ImportPostCode, &str)] = &[
+    (
+        ImportPostCode::RequiresOneJournal,
+        "import_post_requires_one_journal",
+    ),
+    (
+        ImportPostCode::RequiresOneVoucher,
+        "import_post_requires_one_voucher",
+    ),
+    (ImportPostCode::BatchTooLarge, "import_post_batch_too_large"),
+    (
+        ImportPostCode::CompanyMissing,
+        "import_post_company_missing",
+    ),
+    (
+        ImportPostCode::EndpointMismatch,
+        "import_post_endpoint_mismatch",
+    ),
+    (
+        ImportPostCode::RemoteIdsMismatch,
+        "import_post_remote_ids_mismatch",
+    ),
+    (
+        ImportPostCode::NumberedJournalUnsupported,
+        "import_post_numbered_journal_unsupported",
+    ),
+    (
+        ImportPostCode::AmendmentRequiresFileImport,
+        "import_post_amendment_requires_file_import",
+    ),
+    (
+        ImportPostCode::AdmissionInconsistent,
+        "import_post_admission_inconsistent",
+    ),
+    (ImportPostCode::NotDispatched, "import_not_dispatched"),
+    (ImportPostCode::RemoteIdReused, "import_remote_id_reused"),
+    (
+        ImportPostCode::TxnAlreadyPosted,
+        "import_txn_already_posted",
+    ),
+    (
+        ImportPostCode::PreexistingIdentity,
+        "import_preexisting_identity",
+    ),
+    (ImportPostCode::MastersChanged, "import_masters_changed"),
+    (ImportPostCode::BillWiseChanged, "import_bill_wise_changed"),
+    (
+        ImportPostCode::BankClassificationChanged,
+        "import_bank_classification_changed",
+    ),
+    (
+        ImportPostCode::CashLedgerNotCashInHand,
+        "cash_ledger_not_cash_in_hand",
+    ),
+    (
+        ImportPostCode::LedgerHasFoldedTwin,
+        "ledger_has_folded_twin",
+    ),
+    (
+        ImportPostCode::InvoiceNotObserved,
+        "import_invoice_not_observed",
+    ),
+    (ImportPostCode::ReviewTooLarge, "import_review_too_large"),
+    (
+        ImportPostCode::VoucherAmountOverflow,
+        "voucher_amount_overflow",
+    ),
+];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -879,6 +953,8 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(EGRESS),
         of(INVOICE_INPUT),
         of(VOUCHER_READ),
+        of(TOOL_REQUEST),
+        of(IMPORT_POST),
         of(BANK_STATEMENT),
         of(MASTER_POST),
         of(SEARCH),
@@ -928,6 +1004,8 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("EgressCode", EgressCode::ALL),
         of("InvoiceInputCode", InvoiceInputCode::ALL),
         of("VoucherReadCode", VoucherReadCode::ALL),
+        of("ToolRequestCode", ToolRequestCode::ALL),
+        of("ImportPostCode", ImportPostCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("MasterPostCode", MasterPostCode::ALL),
         of("SearchCode", SearchCode::ALL),
@@ -978,7 +1056,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        31,
+        33,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1021,6 +1099,8 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(EGRESS), EgressCode::ALL);
     assert_eq!(variants(INVOICE_INPUT), InvoiceInputCode::ALL);
     assert_eq!(variants(VOUCHER_READ), VoucherReadCode::ALL);
+    assert_eq!(variants(TOOL_REQUEST), ToolRequestCode::ALL);
+    assert_eq!(variants(IMPORT_POST), ImportPostCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -1075,6 +1155,8 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(EGRESS, EgressCode::as_str);
     check_pins(INVOICE_INPUT, InvoiceInputCode::as_str);
     check_pins(VOUCHER_READ, VoucherReadCode::as_str);
+    check_pins(TOOL_REQUEST, ToolRequestCode::as_str);
+    check_pins(IMPORT_POST, ImportPostCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -1095,13 +1177,17 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 12]
-        .iter()
-        .sum();
+    let expected: usize = [
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 12, 2, 21,
+    ]
+    .iter()
+    .sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 12]
-        .iter()
-        .sum();
+    let expected: usize = [
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 12, 2, 21,
+    ]
+    .iter()
+    .sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

@@ -3100,3 +3100,66 @@ async fn the_pre_check_refuses_a_comma_or_a_removed_space_before_any_write() {
         "the pre-check's ledger read, sent as a pair"
     );
 }
+
+/// The SHA-256 of the request `render_master_batch_xml` builds for each master kind, from one
+/// synthetic master each. It sits here because the builder is private to this module; the
+/// request-byte tables of #2397 cannot reach it.
+#[test]
+fn request_bytes_of_every_master_batch_match_the_pinned_rows() {
+    let masters: BookMasters = serde_json::from_value(json!({
+        "units": [{"name": "Nos"}],
+        "godowns": [{"name": "Synthetic Bay", "parent": null}],
+        "stock_groups": [{"name": "Synthetic Stock", "parent": null}],
+        "groups": [{"name": "Synthetic Assets", "parent": "Current Assets"}],
+        "ledgers": [{"name": "Synthetic Cash", "parent": "Cash-in-Hand"}],
+        "stock_items": [{"name": "Synthetic Item", "parent": "Synthetic Stock",
+                         "base_unit": "Nos"}]
+    }))
+    .expect("a synthetic book");
+    let pinned = [
+        (
+            MasterKind::Unit,
+            "4cb5451de84be1bbad6621427ced55504c30fb40ba43a31de1243f99868892a5",
+        ),
+        (
+            MasterKind::Godown,
+            "e9911520c5f2c1032cf3fdc925ba9b44fe78eadb40be6ae26aa08c8277ef0bb1",
+        ),
+        (
+            MasterKind::StockGroup,
+            "c66f5e9eb0c158c213d5ea92b2a7ce5e23afe8dee96ec7faec212f2faf510167",
+        ),
+        (
+            MasterKind::Group,
+            "eb9f520678a6fda7ea01e085e6929949d120313d9c634e09d5e71211bbde82f8",
+        ),
+        (
+            MasterKind::Ledger,
+            "0cc76db01af24b7289877886e46efd032b1cb5206ddeaa1b34ffc2fddccbb8bc",
+        ),
+        (
+            MasterKind::StockItem,
+            "3c8a2b03ea8243caf7406351c527e758010c327f36115c81804a549e27775904",
+        ),
+    ];
+    assert_eq!(
+        pinned.map(|(kind, _)| kind),
+        MasterKind::IMPORT_ORDER,
+        "one row per master kind"
+    );
+    let differing: Vec<String> = pinned
+        .iter()
+        .filter_map(|(kind, expected)| {
+            let xml =
+                render_master_batch_xml("Synthetic & Co <Lab> \"Q\" Ünïcode", *kind, &masters)
+                    .unwrap_or_else(|refusal| panic!("{kind:?} refused: {refusal:?}"));
+            let actual = bridge_tally_protocol::sha256_hex(xml.as_bytes());
+            (actual != *expected).then(|| format!("    (MasterKind::{kind:?}, {actual:?}),"))
+        })
+        .collect();
+    assert!(
+        differing.is_empty(),
+        "request bytes changed (#2397). Rows as built now:\n{}",
+        differing.join("\n")
+    );
+}

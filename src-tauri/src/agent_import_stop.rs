@@ -24,6 +24,7 @@
 //! included: a stop that lifted and came back is another stop than the one
 //! shown. The stop lives in this data folder's journal; another install
 //! posting into the same company is not stopped by it.
+use super::super::failure_code::ImportAckCode;
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount};
 
@@ -322,7 +323,7 @@ impl Server {
             ..
         } = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         // Refused before any read or dialog: nothing of this batch was sent,
         // or it holds no invoice, so it stops nothing.
         if !dispatched || !holds_an_invoice(&line) {
@@ -381,7 +382,7 @@ impl Server {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.generation != held.generation
             || current.batch.sha256 != line.sha256
             || !self

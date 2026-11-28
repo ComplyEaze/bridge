@@ -582,6 +582,70 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals a request to any tool can end in, whatever the tool: the person cancelled it,
+    /// or the configured Tally endpoint is not a loopback origin.
+    pub(crate) enum ToolRequestCode {
+        /// The person cancelled the request before it finished.
+        RequestCancelled = "request_cancelled",
+        /// The configured Tally endpoint is not a loopback origin, so nothing is sent to it.
+        HostSettingInvalid = "host_setting_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a native voucher post and its admission (`agent_import_post.rs`): a batch
+    /// this post cannot take, a book that changed since the batch was approved, a journal record
+    /// that cannot be trusted, or a review text that cannot be shown whole.
+    pub(crate) enum ImportPostCode {
+        /// The desktop's journal-only post was given a batch it does not take: no voucher, more
+        /// than one, one that is not a Journal, or no batch identity scheme.
+        RequiresOneJournal = "import_post_requires_one_journal",
+        /// The agent's post was given a batch it does not take: no voucher, more than it admits,
+        /// a voucher type it does not post, or no batch identity scheme.
+        RequiresOneVoucher = "import_post_requires_one_voucher",
+        /// The batch holds more vouchers than one post, or the journal, admits.
+        BatchTooLarge = "import_post_batch_too_large",
+        /// The batch names no company.
+        CompanyMissing = "import_post_company_missing",
+        /// The batch was approved for another Tally endpoint than the one configured now.
+        EndpointMismatch = "import_post_endpoint_mismatch",
+        /// The batch's recorded remote ids do not match its vouchers one for one.
+        RemoteIdsMismatch = "import_post_remote_ids_mismatch",
+        /// A voucher carries its own number, which a native journal post does not set.
+        NumberedJournalUnsupported = "import_post_numbered_journal_unsupported",
+        /// The batch amends vouchers already in the book, which only a file import can do.
+        AmendmentRequiresFileImport = "import_post_amendment_requires_file_import",
+        /// The journal records an admission that its own checks would not have made.
+        AdmissionInconsistent = "import_post_admission_inconsistent",
+        /// The batch was never sent to Tally, so there is no post to read back.
+        NotDispatched = "import_not_dispatched",
+        /// A remote id minted for this post is one the journal already records.
+        RemoteIdReused = "import_remote_id_reused",
+        /// A row of this batch is already recorded as posted.
+        TxnAlreadyPosted = "import_txn_already_posted",
+        /// A voucher of this batch is already in the book.
+        PreexistingIdentity = "import_preexisting_identity",
+        /// A ledger the batch names no longer matches the book exactly.
+        MastersChanged = "import_masters_changed",
+        /// A ledger's bill-wise setting changed since the batch was approved.
+        BillWiseChanged = "import_bill_wise_changed",
+        /// A ledger's cash or bank classification changed since the batch was approved.
+        BankClassificationChanged = "import_bank_classification_changed",
+        /// A ledger the batch treats as cash is not under Cash-in-Hand in the book.
+        CashLedgerNotCashInHand = "cash_ledger_not_cash_in_hand",
+        /// A ledger name the batch requests now folds equal to two or more live ledgers, so
+        /// Tally's import lookup could take one for the other.
+        LedgerHasFoldedTwin = "ledger_has_folded_twin",
+        /// An invoice voucher carries no observed invoice detail to post or review.
+        InvoiceNotObserved = "import_invoice_not_observed",
+        /// The review text is longer, or has more or longer lines, than one review shows.
+        ReviewTooLarge = "import_review_too_large",
+        /// A voucher's amounts overflow when they are added up for its review text.
+        VoucherAmountOverflow = "voucher_amount_overflow",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

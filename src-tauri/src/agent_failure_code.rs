@@ -1383,13 +1383,13 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// Two refusals of an `outstandings` party detail once its reads have begun
-    /// (`agent_bill_trail.rs`). The detail's other refusals are not declared here.
+    /// Two refusals of an `outstandings` party detail (`agent_outstandings.rs`,
+    /// `agent_bill_trail.rs`). The detail's other refusals are not declared here.
     pub(crate) enum PartyDetailReadCode {
         /// The company has no books-from date, so the detail's voucher window has no start.
         TrailBooksFromMissing = "trail_books_from_missing",
-        /// A refusal: the detail's read is partial. The read's own partial reason is kept beside
-        /// it.
+        /// The party detail needs a complete bills read, and that read is partial or has ledgers
+        /// set aside. The read's own partial reason is kept beside it.
         RequiresCompleteRead = "detail_requires_a_complete_read",
     }
 }

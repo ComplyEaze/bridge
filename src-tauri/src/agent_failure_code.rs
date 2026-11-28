@@ -554,6 +554,34 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the ledger-create master tool and its read-back (`agent_master_tools.rs`,
+    /// `agent_master_verify.rs`): an item the caller sent that is not an admitted ledger, and a
+    /// stored batch that is missing, no longer parses, or has no recorded intent.
+    pub(crate) enum MasterLedgerCode {
+        /// The item's `kind` is not `party`, `suspense` or `gst_duty`.
+        KindNotAdmitted = "master_kind_not_admitted",
+        /// The item carries a field its kind does not take.
+        FieldNotForKind = "ledger_field_not_for_kind",
+        /// A party item's `side` is neither `sundry_debtors` nor `sundry_creditors`.
+        PartySideInvalid = "party_side_invalid",
+        /// A party item has no `side`.
+        PartySideRequired = "party_side_required",
+        /// A GST duty item has no `duty_head`.
+        GstDutyHeadRequired = "gst_duty_head_required",
+        /// A GST duty item's `duty_head` is not one Bridge admits.
+        GstDutyHeadNotAdmitted = "gst_duty_head_not_admitted",
+        /// The call has neither `ledger` nor `ledgers`.
+        LedgerRequired = "ledger_required",
+        /// A stored batch's ledgers no longer parse as an admitted batch.
+        BatchInvalid = "master_batch_invalid",
+        /// No stored batch has this identifier.
+        BatchNotFound = "master_batch_not_found",
+        /// A stored batch has no recorded intent to verify against.
+        IntentMissing = "master_intent_missing",
+    }
+}
+
+failure_codes! {
     /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs`), the voucher summary
     /// and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
     /// that the read cannot admit.

@@ -537,6 +537,23 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the one held post approval: a post dialog that is open, or a person's
+    /// answer to one, kept for the call that redeems it.
+    pub(crate) enum ImportApprovalCode {
+        /// The approval ran out of time before a call redeemed it.
+        Expired = "import_approval_expired",
+        /// Another call is redeeming this batch's approval now.
+        InUse = "import_approval_in_use",
+        /// No approval for this batch is held: it was revoked, or another batch's is held.
+        Revoked = "import_approval_revoked",
+        /// What is to be posted is no longer what the person approved.
+        BindingChanged = "import_approval_binding_changed",
+        /// The one place for a post approval or its dialog is already taken.
+        Busy = "post_approval_busy",
+    }
+}
+
+failure_codes! {
     /// The refusals of the ledger-create master tool and its read-back (`agent_master_tools.rs`,
     /// `agent_master_verify.rs`): an item the caller sent that is not an admitted ledger, and a
     /// stored batch that is missing, no longer parses, or has no recorded intent.

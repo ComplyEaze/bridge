@@ -307,7 +307,7 @@ impl ReadOnlyProfileId {
     fn template(self) -> String {
         match self {
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
+            Self::CompanyBookExtentV2 => render_company_book_extent_v2(&template_company()),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(&template_company()),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(&template_company()),
             Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(&template_company()),
@@ -454,9 +454,7 @@ impl ReadOnlyProfile<'_> {
     pub fn render(self) -> String {
         match self {
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV2 { company } => {
-                render_company_book_extent_v2(company.as_str())
-            }
+            Self::CompanyBookExtentV2 { company } => render_company_book_extent_v2(company),
             Self::StandardLedgerIdentityV1 { company } => render_standard_ledger_identity(company),
             Self::StandardLedgerCatalogV1 { company } => render_standard_ledger_identity(company),
             Self::StandardLedgerCatalogV2 { company } => render_standard_ledger_catalog_v2(company),

@@ -97,7 +97,7 @@ fn pre_image_of(read: &StockItemCatalogue) -> PreImage {
     PreImage::new(
         read.items()
             .iter()
-            .map(|item| (item.guid.clone(), item.alter_id)),
+            .map(|item| (item.guid().to_owned(), item.alter_id())),
     )
     .unwrap()
 }

@@ -201,7 +201,7 @@ impl TallyRuntime {
                         parse_native_ledger_snapshot_for_company(&xml, identity.company_guid());
 
                     let request =
-                        render_ledger_outstandings_request(identity.display_name(), &party.0, &to);
+                        render_ledger_outstandings_request(identity.company_name(), &party.0, &to);
                     let (body, bytes, hash) =
                         client.fetch_party_bills_paired(request.clone()).await?;
                     evidence = evidence

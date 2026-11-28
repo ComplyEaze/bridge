@@ -1988,7 +1988,7 @@ impl super::super::Server {
             return only("invoice_readback_failed", mark_evidence);
         };
         let request = super::super::invoice_readback_read(
-            &company.name,
+            identity.company_name(),
             &type_guid,
             &number,
             (&year.0, &year.1),
@@ -2015,7 +2015,7 @@ impl super::super::Server {
                 Some(months) => {
                     for month in &months {
                         let request = super::super::invoice_window_numbers_read(
-                            &company.name,
+                            identity.company_name(),
                             class,
                             (&month.0, &month.1),
                         );
@@ -2435,7 +2435,7 @@ impl InvoiceJudge<'_> {
         &self,
         need: Need,
     ) -> Result<crate::tally::agent_read_request::AgentReadRequest, Verdict> {
-        let company = self.identity.display_name();
+        let company = self.identity.company_name();
         match need {
             Need::VoucherTypes => admitted(super::super::invoice_voucher_types_read(company)),
             Need::Registration => {
@@ -2525,7 +2525,7 @@ impl InvoiceJudge<'_> {
             .map(|index| &months[index])
             .ok_or_else(unreadable)?;
         admitted(super::super::invoice_window_numbers_read(
-            self.identity.display_name(),
+            self.identity.company_name(),
             self.class()?,
             (&month.0, &month.1),
         ))

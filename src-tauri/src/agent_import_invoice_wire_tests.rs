@@ -2,6 +2,11 @@ use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 
+/// A company name the tests' requests carry, as the builders take it.
+fn company_name(company: &str) -> ValidatedCompanyName {
+    ValidatedCompanyName::new(company).expect("a company name a request can carry")
+}
+
 /// How many Sales-class rows a window answer holds, as the control's miss
 /// reports them.
 fn sales_count(xml: &str) -> Result<usize, &'static str> {
@@ -240,14 +245,14 @@ fn the_window_read_is_the_one_the_lab_sent_for_each_month_and_for_a_year() {
     assert_eq!(months.len(), sent.len());
     for ((from, to), sha256) in months.iter().zip(sent) {
         let rendered = render_invoice_window_numbers_request(
-            "BRIDGE CORPUS DENSE",
+            &company_name("BRIDGE CORPUS DENSE"),
             InvoiceClass::Sales,
             (from, to),
         );
         assert_eq!(sent_sha256(&rendered), sha256, "{}", from.as_str());
     }
     let year = render_invoice_window_numbers_request(
-        "BRIDGE PILOT LAB",
+        &company_name("BRIDGE PILOT LAB"),
         InvoiceClass::Sales,
         (&date("20260401"), &date("20270331")),
     );
@@ -305,8 +310,11 @@ fn the_m1_requests_are_the_ones_the_renderer_writes() {
         let months = calendar_months(&date(from), &date(to)).unwrap();
         assert_eq!(months.len(), sent.len());
         for ((from, to), sha256) in months.iter().zip(sent) {
-            let rendered =
-                render_invoice_window_numbers_request(company, InvoiceClass::Sales, (from, to));
+            let rendered = render_invoice_window_numbers_request(
+                &company_name(company),
+                InvoiceClass::Sales,
+                (from, to),
+            );
             assert_eq!(
                 sent_sha256(&rendered),
                 sha256,
@@ -366,8 +374,11 @@ fn the_number_read_is_the_one_the_lab_answered_with_the_e_invoice_words() {
             "43cec4b9b334012bea51cd1c68c019b61111577befb3304c3a165a70d7b145a5",
         ),
     ] {
-        let rendered =
-            render_invoice_number_request("BRIDGE EINVOICE LAB", &number(text), (&from, &to));
+        let rendered = render_invoice_number_request(
+            &company_name("BRIDGE EINVOICE LAB"),
+            &number(text),
+            (&from, &to),
+        );
         assert_eq!(sent_sha256(&rendered), sha256, "{text}");
     }
 }
@@ -393,8 +404,11 @@ fn the_number_read_less_the_e_invoice_words_is_the_one_the_lab_answered_for_each
             "c4e19dfbaae315e436af22a12ac7fc097a35da7248529b5fc5de23a5d195e34d",
         ),
     ] {
-        let rendered =
-            render_invoice_number_request("BRIDGE PILOT LAB", &number(text), (&from, &to));
+        let rendered = render_invoice_number_request(
+            &company_name("BRIDGE PILOT LAB"),
+            &number(text),
+            (&from, &to),
+        );
         let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
         assert_eq!(rendered.matches(words).count(), 1, "{text}");
         assert_eq!(
@@ -427,7 +441,8 @@ fn a_number_the_sales_guard_declines_is_answered_in_band_with_nothing_created() 
 #[test]
 fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
     let (from, to) = (date("20250401"), date("20260331"));
-    let request = render_invoice_number_request("Co", &number("INV/26-27/0042"), (&from, &to));
+    let request =
+        render_invoice_number_request(&company_name("Co"), &number("INV/26-27/0042"), (&from, &to));
     assert!(
         request.contains("$VoucherNumber = \"INV/26-27/0042\"</SYSTEM>"),
         "the number is the only literal beside the dates"
@@ -829,7 +844,12 @@ fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     let guid = &format!("{}-00000193", sentinel_uuid(0x5));
     let (from, to) = (date("20250401"), date("20260331"));
     let type_guid = VoucherTypeGuid::parse(guid).expect("a hex-and-hyphen GUID");
-    let request = render_invoice_readback_request("Co", &type_guid, &number("278"), (&from, &to));
+    let request = render_invoice_readback_request(
+        &company_name("Co"),
+        &type_guid,
+        &number("278"),
+        (&from, &to),
+    );
     assert!(request.contains(&format!("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"{guid}\"</SYSTEM>")));
     assert!(request.contains("ALLLEDGERENTRIES.*"));
     // Neither a GUID nor a number that could close the literal becomes one.
@@ -876,7 +896,7 @@ fn refused_as(xml: &str, as_of: &str) -> &'static str {
 
 #[test]
 fn the_company_registration_in_force_is_read_from_the_captured_tax_units() {
-    let request = render_company_registration_request("Co & Sons");
+    let request = render_company_registration_request(&company_name("Co & Sons"));
     assert!(request.contains("<TYPE>TaxUnit</TYPE>") && request.contains("Co &amp; Sons"));
     let read = Ok(CompanyRegistration {
         gstin: "08ZZZZZ0000Z1ZQ".into(),
@@ -1378,7 +1398,7 @@ const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/test
 fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
     let sent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.request.utf16le.xml"));
     let (from, to) = (date("20260401"), date("20260801"));
-    let rendered = render_ledger_rates_request("BRIDGE PILOT LAB", (&from, &to));
+    let rendered = render_ledger_rates_request(&company_name("BRIDGE PILOT LAB"), (&from, &to));
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
     let answered = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
     assert_eq!(
@@ -1394,8 +1414,10 @@ fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
         assert!(TallyDate::parse(bad).is_err(), "{bad:?}");
     }
     // A company name is escaped into the request.
-    assert!(render_ledger_rates_request("A & B", (&from, &to))
-        .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>"));
+    assert!(
+        render_ledger_rates_request(&company_name("A & B"), (&from, &to))
+            .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>")
+    );
 }
 
 /// The rates request restricted to the named ledgers is the unfiltered one
@@ -1407,12 +1429,13 @@ fn a_ledger_scoped_rates_request_adds_only_the_guid_formula_and_its_filter() {
     use bridge_tally_protocol::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
     let (from, to) = (date("20260401"), date("20260801"));
     let window = (&from, &to);
-    let whole = render_ledger_rates_request("BRIDGE PILOT LAB", window);
+    let whole = render_ledger_rates_request(&company_name("BRIDGE PILOT LAB"), window);
     let part = LedgerGuidPart::new(
         ["guid-b", "guid-a"].map(|guid| LedgerGuid::parse(&guid.replace("guid", "abc")).unwrap()),
     )
     .unwrap();
-    let scoped = render_ledger_rates_request_for_ledgers("BRIDGE PILOT LAB", window, &part);
+    let scoped =
+        render_ledger_rates_request_for_ledgers(&company_name("BRIDGE PILOT LAB"), window, &part);
     let formula = concat!(
         "<SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceLedgers\">",
         "$GUID = \"abc-a\" OR $GUID = \"abc-b\"</SYSTEM>"
@@ -1978,7 +2001,7 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
     let (from, to) = (date("20260401"), date("20270331"));
     let sent = |text: &str| {
         let rendered = render_invoice_readback_request(
-            "BRIDGE PILOT LAB",
+            &company_name("BRIDGE PILOT LAB"),
             &type_guid,
             &number(text),
             (&from, &to),
@@ -1995,7 +2018,7 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
     let added = ", GSTREGISTRATION, CMPGSTIN</FETCH>";
     let sent = |text: &str| {
         let rendered = render_invoice_readback_request(
-            "BRIDGE PILOT LAB",
+            &company_name("BRIDGE PILOT LAB"),
             &type_guid,
             &number(text),
             (&from, &to),
@@ -2049,7 +2072,7 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
 #[test]
 fn the_group_hsn_request_is_the_answered_listing_with_the_hsn_rows() {
     let sent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.request.utf16le.xml"));
-    let rendered = render_group_hsn_request("BRIDGE PILOT LAB");
+    let rendered = render_group_hsn_request(&company_name("BRIDGE PILOT LAB"));
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
     assert_eq!(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
@@ -2061,6 +2084,6 @@ fn the_group_hsn_request_is_the_answered_listing_with_the_hsn_rows() {
         ),
         rendered
     );
-    assert!(render_group_hsn_request("A & B")
+    assert!(render_group_hsn_request(&company_name("A & B"))
         .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>"));
 }

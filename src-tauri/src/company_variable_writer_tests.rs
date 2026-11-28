@@ -30,9 +30,9 @@ const SEAM: &str = "static_variables_for_unvalidated_company";
 /// `&str` and was moved onto the seam rather than left writing the block itself. It fell to 27
 /// when the trial balance builders took `&ValidatedCompanyName`, to 26 when the built-in
 /// report envelope did, to 18 when the outstandings builders did, and to 14 when the census,
-/// inventory-flags and company-features builders did, and to 11 when the masters, party-bills and
-/// company-book-extent builders did.
-const SEAM_CEILING: usize = 11;
+/// inventory-flags and company-features builders did, to 11 when the masters, party-bills and
+/// company-book-extent builders did, and to 4 when the invoice reads did.
+const SEAM_CEILING: usize = 4;
 
 /// The string literals of [`WRITER`] that open the block, exactly: the private writer's template
 /// and the company-list template, which names no company.

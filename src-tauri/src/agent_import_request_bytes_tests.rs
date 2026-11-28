@@ -17,12 +17,12 @@
 //! private to it, are reachable; the protocol crate's builders are pinned in
 //! its own `request_bytes_tests`.
 //!
-//! Three lab write requests are not pinned. `render_master_batch_xml` is
-//! private to `lab::import` and so unreachable here. `render_voucher_batch_xml`
-//! mints a fresh `Uuid::new_v4` for each voucher, so its bytes differ on every
-//! call. `lab_import_masters` calls `render_import_envelope` inline, with no
-//! builder of its own to call. The envelope all three send is the protocol
-//! crate's `render_import_envelope/*` rows.
+//! `render_master_batch_xml` is private to `lab::import`, so its rows are pinned
+//! in that module's tests. Two lab write requests are not pinned.
+//! `render_voucher_batch_xml` mints a fresh `Uuid::new_v4` for each voucher, so
+//! its bytes differ on every call. `lab_import_masters` calls
+//! `render_import_envelope` inline, with no builder of its own to call. The
+//! envelope both send is the protocol crate's `render_import_envelope/*` rows.
 
 use std::collections::BTreeSet;
 
@@ -33,13 +33,15 @@ use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 use super::cancel::{render_native_cancel_xml, RemoteId};
 use super::invoice::{
     render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request_for_ledgers,
-    render_voucher_types_request, InvoiceNumber, VoucherTypeGuid,
+    render_invoice_readback_request, render_invoice_window_numbers_request,
+    render_ledger_rates_request_for_ledgers, render_voucher_types_request, InvoiceNumber,
+    VoucherTypeGuid,
 };
 use super::tests::{sentinel_batch_id, sentinel_uuid};
 use super::{
     render_import_verification_in_span, render_import_verification_read, render_import_xml,
-    render_native_vouchers_as, render_native_vouchers_xml, ImportVoucher, VoucherAction,
+    render_native_vouchers_as, render_native_vouchers_xml, ImportVoucher, InvoiceClass,
+    VoucherAction,
 };
 use crate::agent::read_profiles::{
     render_agent_class_vouchers_in_span, render_agent_company_high_water,
@@ -177,6 +179,10 @@ const TABLE: &[(&str, &str)] = &[
     (
         "render_invoice_number_request",
         "bd849e43daa5547b5828b0c029d1c94455167e9b8fe609fa804d580ea56683f6",
+    ),
+    (
+        "render_invoice_window_numbers_request/Sales",
+        "45c5cc308621d6896653c0b59e8817fe7e3e93a164b17d58d59508574de2b9f8",
     ),
     (
         "render_invoice_readback_request",
@@ -460,6 +466,19 @@ fn built_requests() -> Vec<(String, String)> {
             (&from, &to),
         )),
     );
+    for class in every!(InvoiceClass: Sales) {
+        let name = match class {
+            InvoiceClass::Sales => "Sales",
+        };
+        row(
+            &format!("render_invoice_window_numbers_request/{name}"),
+            Ok(render_invoice_window_numbers_request(
+                COMPANY,
+                class,
+                (&from, &to),
+            )),
+        );
+    }
     row(
         "render_invoice_readback_request",
         Ok(render_invoice_readback_request(

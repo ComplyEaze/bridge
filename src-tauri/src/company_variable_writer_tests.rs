@@ -2,8 +2,10 @@
 //!
 //! `ValidatedCompanyName::xml_static_variables` in the protocol crate renders the
 //! `STATICVARIABLES` block and its `SVCURRENTCOMPANY`. These scans hold that in place: no other
-//! production file writes either, and the unvalidated seam beside the writer is used by no more
-//! builders than today.
+//! production file writes either, the unvalidated seam beside the writer is used by no more
+//! builders than today, and each file calls the writer exactly as often as its pinned count, so
+//! a new call of the writer fails until it is counted. A new entry point that reaches an
+//! existing call through a shared core adds no call and is not caught here.
 //!
 //! Both scans read the production sources that `hand_entry_texts_tests` reads (`src` and each
 //! `crates/*/src`), and also `build.rs`, `examples` and each `crates/*/examples` and
@@ -31,6 +33,67 @@ const SEAM: &str = "static_variables_for_unvalidated_company";
 /// inventory-flags and company-features builders did, and to 11 when the masters, party-bills and
 /// company-book-extent builders did.
 const SEAM_CEILING: usize = 11;
+
+/// The string literals of [`WRITER`] that open the block, exactly: the private writer's template
+/// and the company-list template, which names no company.
+const WRITER_LITERALS: usize = 2;
+
+/// The request-byte tables. Every builder whose request reaches the writer is meant to have a row
+/// in one of them, or to be listed in [`NOT_PINNED`]; review keeps that, not a test.
+const TABLES: [&str; 2] = [
+    "crates/bridge-tally-protocol/src/request_bytes_tests.rs",
+    "src/agent_import_request_bytes_tests.rs",
+];
+
+/// Builders whose request reaches the writer, directly or through a shared envelope, and that
+/// have no row in [`TABLES`], with their file and why. The test checks only that each one is
+/// defined where listed and has no row.
+const NOT_PINNED: &[(&str, &str, &str)] = &[(
+    "render_voucher_batch_xml",
+    "src/agent_lab_import.rs",
+    "it mints a fresh UUID for each voucher, so its bytes differ on every call",
+)];
+
+/// The production calls of the writer each file holds, exactly: calls of
+/// `xml_static_variables`, of the seam, and of the private `static_variables`. In [`WRITER`]
+/// the last includes the two calls through which the typed method and the seam reach it. A
+/// builder moved from the seam to `xml_static_variables` leaves its file's count unchanged.
+const WRITER_CALLS: &[(&str, usize)] = &[
+    ("crates/bridge-tally-protocol/src/import_envelope.rs", 1),
+    ("crates/bridge-tally-protocol/src/ledger_census.rs", 2),
+    (
+        "crates/bridge-tally-protocol/src/native_company_features.rs",
+        1,
+    ),
+    ("crates/bridge-tally-protocol/src/native_masters.rs", 2),
+    (
+        "crates/bridge-tally-protocol/src/native_outstandings/party_bills.rs",
+        1,
+    ),
+    (
+        "crates/bridge-tally-protocol/src/native_outstandings/request.rs",
+        8,
+    ),
+    (
+        "crates/bridge-tally-protocol/src/native_statement_reports.rs",
+        1,
+    ),
+    (
+        "crates/bridge-tally-protocol/src/native_stock_summary.rs",
+        1,
+    ),
+    (
+        "crates/bridge-tally-protocol/src/native_trial_balance/mod.rs",
+        1,
+    ),
+    ("crates/bridge-tally-protocol/src/outstandings_shared.rs", 1),
+    ("crates/bridge-tally-protocol/src/xml_read_profiles.rs", 8),
+    ("src/agent_import.rs", 1),
+    ("src/agent_import_invoice_wire.rs", 7),
+    ("src/agent_lab.rs", 2),
+    ("src/agent_lab_import.rs", 2),
+    ("src/agent_read_profiles.rs", 4),
+];
 
 /// Production files whose string literals name the variable without writing a request, with
 /// the most such literals each may hold and why.
@@ -101,6 +164,36 @@ fn seam_uses(code: &str, aliases: &BTreeSet<String>) -> (usize, usize) {
         }
     }
     (uses, definitions)
+}
+
+/// Calls of the writer in blanked `code`: the seam's [`seam_uses`], each `xml_static_variables`
+/// not after `fn`, and each `static_variables` followed by `(` and not after `fn`. A local of
+/// that name is not a call; the private writer passed as a function value is not counted
+/// either, and only its own file could do that.
+fn writer_calls(code: &str, aliases: &BTreeSet<String>) -> usize {
+    let mut words: Vec<(&str, usize)> = Vec::new();
+    let mut start = None;
+    for (at, ch) in code.char_indices().chain([(code.len(), ' ')]) {
+        match (ch.is_ascii_alphanumeric() || ch == '_', start) {
+            (true, None) => start = Some(at),
+            (false, Some(from)) => {
+                words.push((&code[from..at], at));
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    let typed_or_private = words
+        .iter()
+        .enumerate()
+        .filter(|(at, (word, end))| {
+            let after_fn = *at > 0 && words[at - 1].0 == "fn";
+            let called = code[*end..].trim_start().starts_with('(');
+            !after_fn
+                && (*word == "xml_static_variables" || (*word == "static_variables" && called))
+        })
+        .count();
+    seam_uses(code, aliases).0 + typed_or_private
 }
 
 /// How many string literals of `source` name the variable or open the block: `<SVCURRENTCOMPANY`
@@ -217,6 +310,40 @@ fn the_scans_count_what_they_say() {
         "an inline test module is not production"
     );
 
+    let calls = |code: &str| writer_calls(&blanked(code), &aliases(&blanked(code)));
+    assert_eq!(
+        calls("fn f(c: &C) -> String { c.xml_static_variables(\"\", \"\") }"),
+        1
+    );
+    assert_eq!(
+        calls(
+            "fn f() { let static_variables = c.xml_static_variables(a, b); g(&static_variables) }"
+        ),
+        1,
+        "a local named like the private writer is not a call"
+    );
+    assert_eq!(
+        calls(
+            "fn static_variables(a: &str) -> String { a.into() }\nfn f() { static_variables(a) }"
+        ),
+        1,
+        "a definition is not a call"
+    );
+    assert_eq!(
+        calls("pub fn xml_static_variables(&self) -> String { super::static_variables(a, b, c) }"),
+        1
+    );
+    assert_eq!(
+        calls("use x::{static_variables_for_unvalidated_company as sv};\nfn f() { sv(a, b, c); }"),
+        1,
+        "a seam call through an alias is a call"
+    );
+    assert_eq!(
+        calls("// c.xml_static_variables(a, b)\nconst A: &str = \"static_variables(\";"),
+        0,
+        "comments and literals are not code"
+    );
+
     assert_eq!(
         writer_hits("const A: &str = \"<STATICVARIABLES><SVCURRENTCOMPANY>\";"),
         1
@@ -291,10 +418,13 @@ fn no_production_file_but_the_writer_writes_the_company_variable() {
         .collect();
     let mut problems: Vec<String> = unread(&sources).into_iter().collect();
     match sources.get(WRITER) {
-        Some(writer) if writer_hits(writer) > 0 => {}
-        _ => problems.push(format!(
-            "{WRITER}: not read, or its block not found, so the scan proves nothing"
+        Some(writer) if writer_hits(writer) == WRITER_LITERALS => {}
+        Some(writer) => problems.push(format!(
+            "{WRITER}: {} literal(s) open the block, exactly {WRITER_LITERALS} expected: a new \
+             template there needs a row in the request-byte tables {TABLES:?}",
+            writer_hits(writer)
         )),
+        None => problems.push(format!("{WRITER}: not read, so the scan proves nothing")),
     }
     for path in allowed.keys() {
         if !sources.contains_key(*path) {
@@ -321,4 +451,80 @@ fn no_production_file_but_the_writer_writes_the_company_variable() {
          `ValidatedCompanyName::xml_static_variables` (#2397).\n{}",
         problems.join("\n")
     );
+}
+
+#[test]
+fn each_file_calls_the_writer_as_often_as_pinned() {
+    let sources = sources();
+    if let Some(problem) = unread(&sources) {
+        panic!("{problem}");
+    }
+    let blanked: BTreeMap<&str, String> = sources
+        .iter()
+        .map(|(path, source)| (path.as_str(), blanked(source)))
+        .collect();
+    let aliases: BTreeSet<String> = blanked.values().flat_map(|code| aliases(code)).collect();
+    let found: BTreeMap<&str, usize> = blanked
+        .iter()
+        .map(|(path, code)| (*path, writer_calls(code, &aliases)))
+        .filter(|(_, calls)| *calls > 0)
+        .collect();
+    let pinned: BTreeMap<&str, usize> = WRITER_CALLS.iter().copied().collect();
+    assert_eq!(
+        pinned.len(),
+        WRITER_CALLS.len(),
+        "WRITER_CALLS names a file twice"
+    );
+    assert!(
+        found.values().sum::<usize>() > 0,
+        "no call of the writer found, so the scan proves nothing"
+    );
+    if found != pinned {
+        let table: String = found
+            .iter()
+            .map(|(path, calls)| format!("    ({path:?}, {calls}),\n"))
+            .collect();
+        panic!(
+            "the production calls of the company-variable writer changed (#2397). Give each new \
+             builder a row in one of {TABLES:?}, or list it in NOT_PINNED with its reason, then \
+             set WRITER_CALLS to the calls found now:\n{table}"
+        );
+    }
+}
+
+#[test]
+fn each_unpinned_builder_is_defined_where_listed_and_has_no_row() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let sources = sources();
+    let tables: Vec<(&str, String)> = TABLES
+        .iter()
+        .map(|path| {
+            let table = fs::read_to_string(root.join(path))
+                .unwrap_or_else(|error| panic!("{path} is unreadable: {error}"));
+            assert!(
+                table.contains("const TABLE: &[(&str, &str)]"),
+                "{path}: no table found"
+            );
+            (*path, table)
+        })
+        .collect();
+    for (builder, path, _) in NOT_PINNED {
+        let code = blanked(
+            sources
+                .get(*path)
+                .unwrap_or_else(|| panic!("{path} is not read")),
+        );
+        assert!(
+            tokens(&code)
+                .windows(2)
+                .any(|window| window == ["fn", *builder]),
+            "{path} defines no `{builder}`: update NOT_PINNED"
+        );
+        for (table_path, table) in &tables {
+            assert!(
+                !table.contains(&format!("\"{builder}")),
+                "`{builder}` has a row in {table_path}: remove it from NOT_PINNED"
+            );
+        }
+    }
 }
